@@ -1338,8 +1338,13 @@ async function demarrerVoix() {
     voixInfo.textContent = `Enregistrement… relâche pour arrêter (${reste}s)`;
     recTimer = setInterval(() => {
       reste--;
+      if (reste <= 0) {
+        clearInterval(recTimer);          // stoppe le décompte tout de suite
+        voixInfo.textContent = "Enregistrement… (1 min max atteint)";
+        arreterVoix();                     // coupe à 1 min pile
+        return;
+      }
       voixInfo.textContent = `Enregistrement… relâche pour arrêter (${reste}s)`;
-      if (reste <= 0) arreterVoix();                       // coupe à 1 min pile
     }, 1000);
   } catch {
     enregistreEnCours = false;
