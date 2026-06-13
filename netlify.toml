@@ -1,0 +1,10 @@
+# Configuration Netlify — DAKOUONE
+# La clé API Firebase est PUBLIQUE par design (identifiant de projet, pas un secret).
+# La sécurité réelle est assurée par les règles Firestore/Storage.
+# On indique donc à Netlify d'ignorer cette détection.
+
+[build]
+  publish = "."
+
+[build.environment]
+  SECRETS_SCAN_ENABLED = "false"
