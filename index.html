@@ -172,22 +172,23 @@
   .photo-zone{border:1.5px dashed #d9e2ea;border-radius:var(--radius);padding:13px;text-align:center;color:var(--muted);font-size:.78rem;cursor:pointer;margin-bottom:7px}
   .photo-zone img{max-width:100%;max-height:110px;border-radius:9px}
 
-  /* ----- Enregistrement vocal (formulaire) ----- */
-  .voix-zone{
-    display:flex;align-items:center;gap:11px;border:1.5px dashed #d9e2ea;border-radius:var(--radius);
-    padding:11px 13px;margin-bottom:7px;
+  /* ----- Enregistrement vocal : gros bouton rouge à maintenir ----- */
+  .voix-zone{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+  .voix-btn-maintien{
+    flex:1;display:flex;align-items:center;justify-content:center;gap:9px;
+    border:1.5px solid var(--alerte);border-radius:var(--radius);
+    background:rgba(255,83,64,.10);color:var(--alerte);
+    padding:13px;cursor:pointer;font-family:inherit;font-weight:700;font-size:.85rem;
+    user-select:none;-webkit-user-select:none;touch-action:none;transition:background .12s;
   }
-  .voix-btn{
-    width:42px;height:42px;border-radius:50%;border:none;flex:none;cursor:pointer;
-    background:rgba(255,83,64,.12);color:var(--alerte);font-size:1.1rem;
-    display:flex;align-items:center;justify-content:center;transition:transform .12s;
+  .voix-btn-maintien .vb-ico{font-size:1.2rem}
+  .voix-btn-maintien.rec{
+    background:var(--alerte);color:#fff;border-color:var(--alerte);
+    animation:pulseRec 1s ease-in-out infinite;
   }
-  .voix-btn:active{transform:scale(.92)}
-  .voix-btn.rec{background:var(--alerte);color:#fff;animation:pulseRec 1s ease-in-out infinite}
-  @keyframes pulseRec{0%,100%{box-shadow:0 0 0 0 rgba(255,83,64,.5)}50%{box-shadow:0 0 0 8px rgba(255,83,64,0)}}
-  .voix-info{flex:1;min-width:0;font-size:.78rem;color:var(--muted)}
-  .voix-info b{color:var(--ink)}
-  .voix-suppr{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;flex:none}
+  .voix-btn-maintien.pret{border-color:var(--ok);background:rgba(15,174,116,.10);color:var(--ok)}
+  @keyframes pulseRec{0%,100%{box-shadow:0 0 0 0 rgba(255,83,64,.45)}50%{box-shadow:0 0 0 9px rgba(255,83,64,0)}}
+  .voix-suppr{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1rem;flex:none;padding:6px}
 
   /* ----- Lecteur vocal (popup) ----- */
   .pop-voix{
@@ -201,8 +202,8 @@
   .pop-voix button:disabled{background:#c3cfda;cursor:not-allowed}
   .pop-voix .vinfo{font-size:.72rem;color:var(--muted);line-height:1.3}
   .pop-voix .vinfo b{color:var(--ink);font-size:.78rem}
-  .avert{font-size:.68rem;color:var(--muted);margin-bottom:16px;line-height:1.45}
-  .avert b{color:var(--vigilance)}
+  .avert{font-size:.68rem;color:var(--alerte);margin-bottom:16px;line-height:1.45}
+  .avert b{color:var(--alerte)}
   .pos-info{background:var(--panel2);border-radius:10px;padding:9px 12px;font-size:.76rem;color:var(--lagon);margin-bottom:16px;display:flex;align-items:center;gap:8px}
   .actions{display:flex;gap:9px}
   .actions button{border:none;border-radius:var(--radius);padding:14px;cursor:pointer;font-family:inherit;font-size:.92rem;font-weight:700}
@@ -421,8 +422,10 @@
     <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
 
     <div class="voix-zone">
-      <button type="button" class="voix-btn" id="voixBtn" title="Enregistrer un vocal">🎙️</button>
-      <div class="voix-info" id="voixInfo">Commentaire vocal (optionnel) — 1 min max, écoutable 3 fois</div>
+      <button type="button" class="voix-btn-maintien" id="voixBtn">
+        <span class="vb-ico">🎙️</span>
+        <span class="vb-txt" id="voixInfo">Maintiens pour enregistrer un vocal</span>
+      </button>
       <button type="button" class="voix-suppr" id="voixSuppr" style="display:none" title="Supprimer">✕</button>
     </div>
     <p class="avert"><b>Ne prends jamais de risque pour une photo.</b> Uniquement de loin, depuis un lieu sûr. Les faux signalements sont retirés et sanctionnés.</p>
@@ -1220,8 +1223,9 @@ function fermerModal() {
   voile.classList.remove("on");
   choixType = null; choixPos = null; fichierPhoto = null; photoDataUrl = null;
   arreterVoix(); fichierVoix = null; voixDataUrl = null;
-  voixBtn.textContent = "🎙️"; voixBtn.classList.remove("rec");
-  voixInfo.innerHTML = "Commentaire vocal (optionnel) — 1 min max, écoutable 3 fois";
+  voixBtn.classList.remove("rec", "pret");
+  voixBtn.querySelector(".vb-ico").textContent = "🎙️";
+  voixInfo.textContent = "Maintiens pour enregistrer un vocal";
   voixSuppr.style.display = "none";
   document.querySelectorAll(".type-btn").forEach(b => b.classList.remove("sel"));
   document.getElementById("commentaire").value = "";
@@ -1293,57 +1297,74 @@ function compresser(fichier, maxDim = 800, qualite = 0.7) {
   });
 }
 
-/* ----- Commentaire vocal (MediaRecorder, 1 min max) ----- */
+/* ----- Commentaire vocal : MAINTENIR pour enregistrer, RELÂCHER pour arrêter (1 min max) ----- */
 const DUREE_VOIX_MAX = 60; // secondes
 const voixBtn = document.getElementById("voixBtn");
 const voixInfo = document.getElementById("voixInfo");
 const voixSuppr = document.getElementById("voixSuppr");
+let enregistreEnCours = false;
 
-voixBtn.onclick = async () => {
-  if (mediaRec && mediaRec.state === "recording") { arreterVoix(); return; }
-  if (fichierVoix) return;   // déjà un enregistrement : il faut le supprimer d'abord
+async function demarrerVoix() {
+  if (enregistreEnCours || fichierVoix) return;            // déjà en cours ou déjà enregistré
   if (!navigator.mediaDevices?.getUserMedia) { toast("Micro non disponible", true); return; }
-
+  enregistreEnCours = true;
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     mediaChunks = [];
     mediaRec = new MediaRecorder(stream);
     mediaRec.ondataavailable = (e) => { if (e.data.size) mediaChunks.push(e.data); };
     mediaRec.onstop = () => {
-      stream.getTracks().forEach(t => t.stop());     // libère le micro
-      fichierVoix = new Blob(mediaChunks, { type: mediaRec.mimeType || "audio/webm" });
-      voixDataUrl = URL.createObjectURL(fichierVoix);
-      const sec = Math.min(DUREE_VOIX_MAX, Math.round((Date.now() - recDebut) / 1000));
+      stream.getTracks().forEach(t => t.stop());
+      clearInterval(recTimer);
       voixBtn.classList.remove("rec");
-      voixBtn.textContent = "🎙️";
-      voixInfo.innerHTML = `<b>Vocal enregistré</b> · ${sec}s · écoutable 3 fois`;
-      voixSuppr.style.display = "block";
+      if (mediaChunks.length) {
+        fichierVoix = new Blob(mediaChunks, { type: mediaRec.mimeType || "audio/webm" });
+        voixDataUrl = URL.createObjectURL(fichierVoix);
+        const sec = Math.min(DUREE_VOIX_MAX, Math.round((Date.now() - recDebut) / 1000));
+        voixBtn.classList.add("pret");
+        voixBtn.querySelector(".vb-ico").textContent = "✓";
+        voixInfo.textContent = `Vocal enregistré · ${sec}s`;
+        voixSuppr.style.display = "block";
+      } else {
+        voixInfo.textContent = "Maintiens pour enregistrer un vocal";
+      }
+      enregistreEnCours = false;
     };
     mediaRec.start();
     recDebut = Date.now();
     voixBtn.classList.add("rec");
-    voixBtn.textContent = "⏹️";
+    voixBtn.querySelector(".vb-ico").textContent = "⏺️";
     let reste = DUREE_VOIX_MAX;
-    voixInfo.innerHTML = `<b>Enregistrement…</b> ${reste}s restantes`;
+    voixInfo.textContent = `Enregistrement… relâche pour arrêter (${reste}s)`;
     recTimer = setInterval(() => {
       reste--;
-      voixInfo.innerHTML = `<b>Enregistrement…</b> ${reste}s restantes`;
-      if (reste <= 0) arreterVoix();   // coupe à 1 min pile
+      voixInfo.textContent = `Enregistrement… relâche pour arrêter (${reste}s)`;
+      if (reste <= 0) arreterVoix();                       // coupe à 1 min pile
     }, 1000);
   } catch {
+    enregistreEnCours = false;
     toast("Autorise le micro pour enregistrer", true);
   }
-};
+}
 
 function arreterVoix() {
-  clearInterval(recTimer);
   if (mediaRec && mediaRec.state === "recording") mediaRec.stop();
+  else { clearInterval(recTimer); voixBtn.classList.remove("rec"); enregistreEnCours = false; }
 }
+
+// Souris (PC) + tactile (mobile) : appui = enregistre, relâchement = stop
+voixBtn.addEventListener("mousedown", (e) => { e.preventDefault(); demarrerVoix(); });
+voixBtn.addEventListener("mouseup", arreterVoix);
+voixBtn.addEventListener("mouseleave", () => { if (enregistreEnCours) arreterVoix(); });
+voixBtn.addEventListener("touchstart", (e) => { e.preventDefault(); demarrerVoix(); }, { passive: false });
+voixBtn.addEventListener("touchend", (e) => { e.preventDefault(); arreterVoix(); }, { passive: false });
+voixBtn.addEventListener("touchcancel", arreterVoix);
 
 voixSuppr.onclick = () => {
   fichierVoix = null; voixDataUrl = null;
-  voixBtn.textContent = "🎙️"; voixBtn.classList.remove("rec");
-  voixInfo.innerHTML = "Commentaire vocal (optionnel) — 1 min max, écoutable 3 fois";
+  voixBtn.classList.remove("pret");
+  voixBtn.querySelector(".vb-ico").textContent = "🎙️";
+  voixInfo.textContent = "Maintiens pour enregistrer un vocal";
   voixSuppr.style.display = "none";
 };
 
