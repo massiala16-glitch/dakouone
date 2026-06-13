@@ -31,8 +31,10 @@
   .logo small{font-size:.65rem;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
   .compteur{
     margin-left:auto;background:var(--panel);border:1px solid #d9e2ea;border-radius:999px;
-    padding:6px 12px;font-size:.8rem;display:flex;align-items:center;gap:7px;
+    padding:6px 12px;font-size:.8rem;display:flex;align-items:center;gap:7px;cursor:pointer;
+    transition:transform .12s;
   }
+  .compteur:active{transform:scale(.95)}
   .dot{width:9px;height:9px;border-radius:50%;background:var(--alerte);animation:pulseDot 1.6s ease-out infinite}
   @keyframes pulseDot{0%{box-shadow:0 0 0 0 rgba(255,83,64,.55)}100%{box-shadow:0 0 0 9px rgba(255,83,64,0)}}
   .profil{
@@ -60,8 +62,17 @@
     background:var(--vigilance);color:#1a1206;border:none;cursor:pointer;border-radius:999px;
     padding:15px 26px;font-size:1rem;font-weight:700;display:flex;align-items:center;gap:9px;
     box-shadow:0 6px 24px rgba(255,176,32,.35), 0 2px 6px rgba(30,50,70,.2);transition:transform .15s;
+    overflow:visible;
   }
   .fab:active{transform:translateX(-50%) scale(.95)}
+  .fab .anneau{
+    position:absolute;inset:-6px;border-radius:999px;pointer-events:none;
+    background:conic-gradient(var(--alerte) var(--p,0deg), transparent 0deg);
+    opacity:0;transition:opacity .15s;
+    -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
+            mask:radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
+  }
+  .fab.presse .anneau{opacity:1}
   .locbtn{
     position:absolute;bottom:30px;right:16px;z-index:1000;width:46px;height:46px;border-radius:50%;
     border:1px solid #d9e2ea;background:var(--panel);color:var(--lagon);cursor:pointer;
@@ -118,6 +129,10 @@
   .pop-btns button{flex:1;border:none;border-radius:9px;padding:8px 4px;cursor:pointer;font-size:.74rem;font-weight:600;font-family:inherit}
   .b-encore{background:rgba(255,176,32,.16);color:var(--vigilance)}
   .b-fini{background:rgba(53,201,142,.14);color:var(--ok)}
+  .b-suppr{
+    width:100%;margin-top:7px;background:rgba(255,83,64,.12);color:var(--alerte);
+    border:none;border-radius:9px;padding:8px 4px;cursor:pointer;font-size:.74rem;font-weight:700;font-family:inherit;
+  }
   .badge-verif{
     display:inline-flex;align-items:center;gap:6px;background:rgba(29,78,216,.18);
     border:1px solid var(--officiel);color:#2f5fd0;border-radius:999px;
@@ -302,7 +317,7 @@
     <b>DAKOU<span>ONE</span></b>
     <small>Vigilance · Maore</small>
   </div>
-  <div class="compteur"><span class="dot"></span><span id="nbActifs">0</span>&nbsp;signalements actifs</div>
+  <div class="compteur" id="compteur"><span class="dot"></span><span id="nbActifs">0</span>&nbsp;signalements actifs</div>
   <div class="points-pill" id="pointsPill">🪨 <span id="pointsVal">0</span></div>
   <button class="profil" id="profilBtn" title="Mon compte">👤</button>
 </header>
@@ -320,6 +335,7 @@
 </div>
 
 <button class="fab" id="ouvrirSignal">
+  <div class="anneau"></div>
   <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
   Signaler
 </button>
@@ -364,7 +380,7 @@
 <div class="voile" id="voile">
   <div class="feuille">
     <h2>Nouveau signalement</h2>
-    <p class="sous">Touche la carte derrière pour placer le point, ou utilise ta position GPS.</p>
+    <p class="sous">Touche la carte derrière pour placer le point, ou utilise ta position GPS. Astuce : maintiens le bouton Signaler pour publier vite sur place.</p>
     <div class="label">Type d'incident</div>
     <div class="grille-types" id="types">
       <button class="type-btn" data-t="coupeurs"><span class="ico">🛑</span>Coupeurs de route</button>
@@ -931,6 +947,22 @@ function majCompteur() {
   document.getElementById("nbActifs").textContent = Object.keys(marqueurs).length;
 }
 
+/* Clic sur "X signalements actifs" → dézoome pour montrer tous les signalements */
+document.getElementById("compteur").onclick = () => {
+  const pts = Object.values(marqueurs).map(m => m.getLatLng());
+  if (pts.length === 0) {
+    map.setView([-12.81, 45.16], 11);
+    toast("Aucun signalement actif pour le moment");
+    return;
+  }
+  if (pts.length === 1) {
+    map.setView(pts[0], 14);
+  } else {
+    map.fitBounds(L.latLngBounds(pts), { padding: [60, 60], maxZoom: 15 });
+  }
+  toast(`${pts.length} signalement${pts.length > 1 ? "s" : ""} sur la carte`);
+};
+
 /* ============================================================
    MARQUEURS — bulle photo Snap Map ou pin classique
    ============================================================ */
@@ -968,6 +1000,9 @@ function popupPour(s) {
   const jauge = estConfirme(s)
     ? `✓ ${s.confirmations || 0} confirmation${(s.confirmations||0) > 1 ? "s" : ""}`
     : `⏳ ${s.confirmations || 0}/${SEUIL_CONFIRMATION} validations — valide sur place si tu y es`;
+  const estMien = utilisateur && s.creePar === utilisateur.uid;
+  const btnSuppr = estMien
+    ? `<button class="b-suppr" data-suppr="${s.id}">🗑️ Supprimer mon signalement</button>` : "";
   return `
     <div class="pop-type">${TYPES[s.type].ico} ${TYPES[s.type].nom}</div>
     <div class="pop-meta">${tempsEcoule(cree)} · expire dans ${reste} min${auteur}</div>
@@ -978,7 +1013,8 @@ function popupPour(s) {
     <div class="pop-btns">
       <button class="b-encore" data-vote="confirme" data-id="${s.id}">Toujours là</button>
       <button class="b-fini" data-vote="infirme" data-id="${s.id}">C'est terminé</button>
-    </div>`;
+    </div>
+    ${btnSuppr}`;
 }
 
 function ajouterMarqueur(s) {
@@ -1056,6 +1092,33 @@ document.addEventListener("click", async (e) => {
   }
 });
 
+/* Suppression de SON propre signalement */
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-suppr]");
+  if (!b) return;
+  const id = b.dataset.suppr;
+  const s = marqueurs[id]?._dak;
+  if (!s || !utilisateur || s.creePar !== utilisateur.uid) return;
+  if (!confirm("Supprimer ton signalement ? Cette action est définitive.")) return;
+
+  if (MODE_DEMO) {
+    retirerMarqueur(id);
+    majCompteur();
+    map.closePopup();
+    toast("Signalement supprimé");
+    return;
+  }
+  try {
+    await fb.deleteDoc(fb.doc(fb.db, "signalements", id));
+    map.closePopup();
+    toast("Signalement supprimé");
+    /* le retrait du marqueur se fait via onSnapshot (type 'removed') */
+  } catch (err) {
+    console.error(err);
+    toast("Suppression impossible", true);
+  }
+});
+
 /* ============================================================
    PUBLICATION
    ============================================================ */
@@ -1068,6 +1131,72 @@ document.getElementById("ouvrirSignal").onclick = () => {
   voile.classList.add("on");
   verifEnvoi();
 };
+
+/* Appui long sur "Signaler" → prend la position GPS et ouvre directement,
+   prêt à publier (raccourci quand on est sur place). */
+(function appuiLong() {
+  const fab = document.getElementById("ouvrirSignal");
+  const anneau = fab.querySelector(".anneau");
+  let timer = null, raf = null, debut = 0, declenche = false;
+  const DUREE = 800; // ms à maintenir
+
+  function start(e) {
+    if (!utilisateur) return;            // le clic normal gérera l'ouverture de l'auth
+    declenche = false;
+    debut = performance.now();
+    fab.classList.add("presse");
+    const anime = () => {
+      const p = Math.min(1, (performance.now() - debut) / DUREE);
+      anneau.style.setProperty("--p", (p * 360) + "deg");
+      if (p < 1) raf = requestAnimationFrame(anime);
+    };
+    raf = requestAnimationFrame(anime);
+    timer = setTimeout(async () => {
+      declenche = true;
+      fin();
+      // Appui long validé : on récupère la position GPS et on ouvre prêt à publier
+      try {
+        const pos = await positionActuelle();
+        const ll = L.latLng(pos.lat, pos.lng);
+        map.setView(ll, 15);
+        choixPos = ll;
+        if (marqueurTemp) map.removeLayer(marqueurTemp);
+        marqueurTemp = L.circleMarker(ll, { radius: 9, color: "#2bb3c8", weight: 2, fillOpacity: .3 }).addTo(map);
+        document.getElementById("posInfo").textContent = "📍 Ta position GPS ✓ (appui long)";
+      } catch {
+        if (MODE_DEMO) {
+          choixPos = L.latLng(-12.78, 45.22);
+          document.getElementById("posInfo").textContent = "📍 Position simulée (démo)";
+        } else {
+          toast("Active ta position GPS pour l'appui long", true);
+        }
+      }
+      voile.classList.add("on");
+      verifEnvoi();
+      if (navigator.vibrate) navigator.vibrate(30);
+    }, DUREE);
+  }
+
+  function fin() {
+    clearTimeout(timer);
+    cancelAnimationFrame(raf);
+    fab.classList.remove("presse");
+    anneau.style.setProperty("--p", "0deg");
+  }
+
+  // Souris + tactile. preventDefault sur touchstart évite le double-déclenchement.
+  fab.addEventListener("mousedown", start);
+  fab.addEventListener("mouseup", fin);
+  fab.addEventListener("mouseleave", fin);
+  fab.addEventListener("touchstart", (e) => { e.preventDefault(); start(e); }, { passive: false });
+  fab.addEventListener("touchend", (e) => {
+    if (declenche) { e.preventDefault(); }   // l'appui long a déjà agi : on bloque le clic
+    else if (utilisateur || true) {           // appui court → comportement normal (onclick)
+      // onclick se déclenchera naturellement si ce n'était pas un long press
+    }
+    fin();
+  });
+})();
 document.getElementById("annuler").onclick = fermerModal;
 
 function fermerModal() {
