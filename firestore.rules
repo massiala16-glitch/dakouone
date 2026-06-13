@@ -1,0 +1,80 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function connecte() { return request.auth != null; }
+
+    function moi() {
+      return get(/databases/$(database)/documents/utilisateurs/$(request.auth.uid)).data;
+    }
+    function estForceOrdre() {
+      return connecte() && moi().role in ['force_ordre', 'admin'];
+    }
+    function nonBanni() {
+      return connecte() && moi().banni == false;
+    }
+
+    // ---- Signalements ----
+    match /signalements/{id} {
+      allow read: if true;  // carte publique, consultable par tous
+
+      allow create: if connecte() && nonBanni()
+        && request.resource.data.type in ['coupeurs','rassemblement','caillassage','barrage']
+        && request.resource.data.niveau in [1,2,3]
+        && request.resource.data.commentaire.size() <= 180
+        && request.resource.data.creePar == request.auth.uid
+        && request.resource.data.statut == 'actif'
+        && request.resource.data.verifiePar == null;
+
+      // Seules les forces de l'ordre changent le statut / posent le badge
+      allow update: if estForceOrdre()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['statut','verifiePar']);
+
+      allow delete: if estForceOrdre();
+
+      // Votes : 1 document par utilisateur (empêche le double vote)
+      match /votes/{uid} {
+        allow read: if true;
+        allow create: if connecte() && uid == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+
+    // ---- Utilisateurs ----
+    match /utilisateurs/{uid} {
+      allow read: if connecte() && (request.auth.uid == uid || estForceOrdre());
+
+      // Création de SON propre profil, rôle citoyen forcé, pas de triche sur les points
+      allow create: if connecte() && request.auth.uid == uid
+        && request.resource.data.role == 'citoyen'
+        && request.resource.data.points == 0
+        && request.resource.data.premium == false
+        && request.resource.data.banni == false;
+
+      // L'utilisateur ne peut modifier QUE certains champs de son propre profil.
+      // - pseudo : autorisé seulement si identité vérifiée
+      // - notifActives, positionApprox, fcmTokens : réglages perso
+      // points / premium / role / banni / identiteVerifiee → Cloud Functions uniquement
+      allow update: if connecte() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['pseudo','notifActives','positionApprox','fcmTokens'])
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['pseudo'])
+          || resource.data.identiteVerifiee == true
+        );
+
+      allow delete: if false;
+    }
+
+    // ---- Partenaires & stats (lecture forces de l'ordre, écriture Functions) ----
+    match /partenaires/{id} {
+      allow read: if estForceOrdre();
+      allow write: if false;
+    }
+    match /statistiques/{jour} {
+      allow read: if estForceOrdre();
+      allow write: if false;
+    }
+  }
+}

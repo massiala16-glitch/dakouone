@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>DAKOUONE — Vigilance Mayotte</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{
+    --night:#f4f8fb; --panel:#ffffff; --panel2:#edf3f8;
+    --ink:#1b2733; --muted:#5f6e7d;
+    --alerte:#ff5340; --vigilance:#f59f0a; --ok:#0fae74; --lagon:#0e9bb5;
+    --officiel:#1d4ed8; --radius:14px; font-size:16px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--night);color:var(--ink)}
+  #map{position:absolute;inset:0;z-index:1;background:#cfe6f0}
+
+  header{
+    position:absolute;top:0;left:0;right:0;z-index:1000;padding:10px 14px;
+    display:flex;align-items:center;gap:10px;
+    background:linear-gradient(to bottom, rgba(244,248,251,.95), rgba(244,248,251,.78) 70%, transparent);
+    pointer-events:none;
+  }
+  header > *{pointer-events:auto}
+  .logo{display:flex;flex-direction:column;line-height:1.05}
+  .logo b{font-size:1.15rem;letter-spacing:.04em}
+  .logo b span{color:var(--vigilance)}
+  .logo small{font-size:.65rem;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
+  .compteur{
+    margin-left:auto;background:var(--panel);border:1px solid #d9e2ea;border-radius:999px;
+    padding:6px 12px;font-size:.8rem;display:flex;align-items:center;gap:7px;
+  }
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--alerte);animation:pulseDot 1.6s ease-out infinite}
+  @keyframes pulseDot{0%{box-shadow:0 0 0 0 rgba(255,83,64,.55)}100%{box-shadow:0 0 0 9px rgba(255,83,64,0)}}
+  .profil{
+    width:36px;height:36px;border-radius:50%;border:1.5px solid #d9e2ea;cursor:pointer;
+    background:var(--panel);color:var(--muted);font-size:.9rem;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .profil.ok{border-color:var(--ok);color:var(--ok)}
+
+  .urgence{
+    position:absolute;top:58px;left:50%;transform:translateX(-50%);z-index:1000;
+    background:rgba(255,255,255,.93);border:1px solid #d9e2ea;border-radius:999px;
+    padding:5px 14px;font-size:.72rem;color:var(--muted);white-space:nowrap;
+  }
+  .urgence b{color:var(--alerte)}
+  .mode-demo{
+    position:absolute;top:92px;left:50%;transform:translateX(-50%);z-index:1000;
+    background:rgba(255,176,32,.12);border:1px solid var(--vigilance);border-radius:999px;
+    padding:4px 13px;font-size:.68rem;color:var(--vigilance);white-space:nowrap;display:none;
+  }
+  .mode-demo.on{display:block}
+
+  .fab{
+    position:absolute;bottom:24px;left:50%;transform:translateX(-50%);z-index:1000;
+    background:var(--vigilance);color:#1a1206;border:none;cursor:pointer;border-radius:999px;
+    padding:15px 26px;font-size:1rem;font-weight:700;display:flex;align-items:center;gap:9px;
+    box-shadow:0 6px 24px rgba(255,176,32,.35), 0 2px 6px rgba(30,50,70,.2);transition:transform .15s;
+  }
+  .fab:active{transform:translateX(-50%) scale(.95)}
+  .locbtn{
+    position:absolute;bottom:30px;right:16px;z-index:1000;width:46px;height:46px;border-radius:50%;
+    border:1px solid #d9e2ea;background:var(--panel);color:var(--lagon);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(30,50,70,.15);
+  }
+
+  .marq{position:relative}
+  .marq .halo{position:absolute;inset:-14px;border-radius:50%;animation:halo 2s ease-out infinite}
+  .marq.n3 .halo{background:radial-gradient(circle, rgba(255,83,64,.45), transparent 70%)}
+  .marq.n2 .halo{background:radial-gradient(circle, rgba(255,176,32,.40), transparent 70%)}
+  .marq.n1 .halo{background:radial-gradient(circle, rgba(43,179,200,.35), transparent 70%)}
+  @keyframes halo{0%{transform:scale(.6);opacity:1}100%{transform:scale(1.5);opacity:0}}
+  .marq .pin{
+    width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:19px;border:2.5px solid;background:var(--panel);box-shadow:0 3px 10px rgba(30,50,70,.22);
+  }
+  .marq.n3 .pin{border-color:var(--alerte)}
+  .marq.n2 .pin{border-color:var(--vigilance)}
+  .marq.n1 .pin{border-color:var(--lagon)}
+
+  .bulle{position:relative;filter:drop-shadow(0 4px 10px rgba(30,50,70,.25))}
+  .bulle .cadre{width:56px;height:56px;border-radius:18px;overflow:hidden;border:3px solid;background:var(--panel)}
+  .bulle .cadre img{width:100%;height:100%;object-fit:cover;display:block}
+  .bulle .pointe{
+    position:absolute;left:50%;bottom:-8px;transform:translateX(-50%);
+    width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:10px solid;
+  }
+  .bulle .mini-ico{
+    position:absolute;bottom:-4px;right:-6px;z-index:2;width:22px;height:22px;border-radius:50%;
+    background:var(--panel);border:2px solid var(--night);
+    display:flex;align-items:center;justify-content:center;font-size:11px;
+  }
+  .bulle.n3 .cadre{border-color:var(--alerte)} .bulle.n3 .pointe{border-top-color:var(--alerte)}
+  .bulle.n2 .cadre{border-color:var(--vigilance)} .bulle.n2 .pointe{border-top-color:var(--vigilance)}
+  .bulle.n1 .cadre{border-color:var(--lagon)} .bulle.n1 .pointe{border-top-color:var(--lagon)}
+  .verif-pastille{
+    position:absolute;top:-7px;right:-7px;z-index:3;width:18px;height:18px;border-radius:50%;
+    background:var(--officiel);border:2px solid var(--night);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:900;
+  }
+
+  .leaflet-popup-content-wrapper{
+    background:var(--panel);color:var(--ink);border-radius:var(--radius);
+    border:1px solid #d9e2ea;box-shadow:0 10px 32px rgba(30,50,70,.18);
+  }
+  .leaflet-popup-tip{background:var(--panel)}
+  .leaflet-popup-content{margin:14px 16px;font-family:inherit;min-width:215px}
+  .pop-type{font-weight:700;font-size:.95rem;display:flex;align-items:center;gap:7px}
+  .pop-meta{color:var(--muted);font-size:.74rem;margin:5px 0 8px}
+  .pop-com{font-size:.82rem;margin-bottom:9px;color:#3d4a58}
+  .pop-photo{width:100%;border-radius:9px;margin-bottom:9px;max-height:150px;object-fit:cover}
+  .pop-conf{font-size:.74rem;color:var(--ok);margin-bottom:9px}
+  .pop-btns{display:flex;gap:7px}
+  .pop-btns button{flex:1;border:none;border-radius:9px;padding:8px 4px;cursor:pointer;font-size:.74rem;font-weight:600;font-family:inherit}
+  .b-encore{background:rgba(255,176,32,.16);color:var(--vigilance)}
+  .b-fini{background:rgba(53,201,142,.14);color:var(--ok)}
+  .badge-verif{
+    display:inline-flex;align-items:center;gap:6px;background:rgba(29,78,216,.18);
+    border:1px solid var(--officiel);color:#2f5fd0;border-radius:999px;
+    padding:4px 11px;font-size:.7rem;font-weight:700;margin-bottom:9px;
+  }
+  .badge-verif::before{
+    content:"✓";width:14px;height:14px;border-radius:50%;background:var(--officiel);color:#fff;
+    font-size:9px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;
+  }
+
+  .voile{
+    position:absolute;inset:0;z-index:2000;background:rgba(30,45,60,.35);
+    display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(3px);
+  }
+  .voile.on{display:flex}
+  .feuille{
+    width:100%;max-width:480px;background:var(--panel);border-radius:22px 22px 0 0;
+    border:1px solid #d9e2ea;border-bottom:none;
+    padding:20px 18px calc(20px + env(safe-area-inset-bottom));
+    max-height:88vh;overflow-y:auto;animation:monte .25s ease;
+  }
+  @keyframes monte{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+  .feuille h2{font-size:1.05rem;margin-bottom:3px}
+  .feuille .sous{color:var(--muted);font-size:.78rem;margin-bottom:16px}
+  .grille-types{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:16px}
+  .type-btn{
+    background:var(--panel2);border:1.5px solid #d9e2ea;border-radius:var(--radius);
+    padding:13px 10px;cursor:pointer;color:var(--ink);font-family:inherit;
+    display:flex;flex-direction:column;align-items:center;gap:6px;font-size:.78rem;font-weight:600;
+  }
+  .type-btn .ico{font-size:1.5rem}
+  .type-btn.sel{border-color:var(--vigilance);background:rgba(255,176,32,.09)}
+  .label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.09em;margin-bottom:7px}
+  .niveaux{display:flex;gap:8px;margin-bottom:16px}
+  .niv{flex:1;border-radius:10px;padding:9px 4px;border:1.5px solid #d9e2ea;cursor:pointer;background:var(--panel2);color:var(--muted);font-size:.74rem;font-weight:600;font-family:inherit;text-align:center}
+  .niv.sel[data-n="1"]{border-color:var(--lagon);color:var(--lagon)}
+  .niv.sel[data-n="2"]{border-color:var(--vigilance);color:var(--vigilance)}
+  .niv.sel[data-n="3"]{border-color:var(--alerte);color:var(--alerte)}
+  textarea, .champ{
+    width:100%;background:var(--panel2);border:1.5px solid #d9e2ea;border-radius:var(--radius);
+    color:var(--ink);padding:11px;font-family:inherit;font-size:.9rem;margin-bottom:14px;
+  }
+  textarea{resize:none;min-height:64px;font-size:.85rem}
+  textarea:focus,.champ:focus{outline:none;border-color:var(--lagon)}
+  .photo-zone{border:1.5px dashed #d9e2ea;border-radius:var(--radius);padding:13px;text-align:center;color:var(--muted);font-size:.78rem;cursor:pointer;margin-bottom:7px}
+  .photo-zone img{max-width:100%;max-height:110px;border-radius:9px}
+  .avert{font-size:.68rem;color:var(--muted);margin-bottom:16px;line-height:1.45}
+  .avert b{color:var(--vigilance)}
+  .pos-info{background:var(--panel2);border-radius:10px;padding:9px 12px;font-size:.76rem;color:var(--lagon);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+  .actions{display:flex;gap:9px}
+  .actions button{border:none;border-radius:var(--radius);padding:14px;cursor:pointer;font-family:inherit;font-size:.92rem;font-weight:700}
+  .annuler{flex:1;background:var(--panel2);color:var(--muted)}
+  .envoyer{flex:2;background:var(--vigilance);color:#1a1206}
+  .envoyer:disabled{opacity:.35;cursor:not-allowed}
+
+  .tel-ligne{display:flex;gap:8px;margin-bottom:14px}
+
+  /* ----- Profil & points ----- */
+  .points-pill{
+    background:var(--panel);border:1px solid #d9e2ea;border-radius:999px;
+    padding:6px 11px;font-size:.8rem;font-weight:700;color:var(--vigilance);
+    display:none;align-items:center;gap:5px;
+  }
+  .points-pill.on{display:flex}
+  .profil-tete{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .profil-avatar{
+    width:56px;height:56px;border-radius:50%;background:var(--panel2);
+    border:2px solid var(--lagon);display:flex;align-items:center;justify-content:center;font-size:26px;
+  }
+  .profil-nom{font-size:1.05rem;font-weight:700}
+  .profil-points{font-size:.85rem;color:var(--vigilance);font-weight:700;margin-top:2px}
+  .statut-id{
+    display:inline-flex;align-items:center;gap:6px;border-radius:999px;
+    padding:4px 11px;font-size:.7rem;font-weight:700;margin-top:6px;
+  }
+  .statut-id.non{background:rgba(139,152,168,.12);border:1px solid #d9e2ea;color:var(--muted)}
+  .statut-id.oui{background:rgba(53,201,142,.12);border:1px solid var(--ok);color:var(--ok)}
+  .ligne-nom{display:flex;gap:8px}
+  .ligne-nom .champ{flex:1;margin-bottom:0}
+  .ligne-nom button{
+    flex:none;border:none;border-radius:var(--radius);padding:0 16px;cursor:pointer;
+    font-family:inherit;font-weight:700;font-size:.85rem;background:var(--lagon);color:#06222a;
+  }
+  .ligne-nom button:disabled{opacity:.35;cursor:not-allowed}
+  .hint-nom{font-size:.68rem;color:var(--muted);margin:7px 0 16px;line-height:1.45}
+  .btn-verif-id{
+    width:100%;border:1.5px solid var(--officiel);background:rgba(29,78,216,.12);color:#2f5fd0;
+    border-radius:var(--radius);padding:12px;cursor:pointer;font-family:inherit;font-weight:700;
+    font-size:.85rem;margin-bottom:16px;
+  }
+  .btn-deco{
+    width:100%;border:none;background:var(--panel2);color:var(--muted);
+    border-radius:var(--radius);padding:12px;cursor:pointer;font-family:inherit;font-weight:700;font-size:.85rem;
+  }
+
+  /* ----- Premium ----- */
+  .badge-premium{
+    display:inline-flex;align-items:center;gap:5px;background:linear-gradient(100deg,#f59f0a,#ffcf6b);
+    color:#3a2706;border-radius:999px;padding:4px 11px;font-size:.7rem;font-weight:800;margin-top:6px;
+  }
+  .carte-premium{
+    border:1.5px solid var(--vigilance);background:linear-gradient(160deg, rgba(245,159,10,.10), rgba(245,159,10,.02));
+    border-radius:var(--radius);padding:15px;margin-bottom:16px;
+  }
+  .carte-premium h3{font-size:.95rem;display:flex;align-items:center;gap:7px;margin-bottom:8px}
+  .carte-premium .prix{font-size:1.5rem;font-weight:800;color:var(--vigilance)}
+  .carte-premium .prix small{font-size:.75rem;color:var(--muted);font-weight:600}
+  .carte-premium ul{list-style:none;margin:10px 0 13px;font-size:.8rem;color:var(--ink)}
+  .carte-premium li{display:flex;gap:8px;margin-bottom:6px;align-items:flex-start}
+  .carte-premium li::before{content:"🔔";flex:none}
+  .carte-premium li.gratuit::before{content:"✓";color:var(--ok);font-weight:900}
+  .btn-premium{
+    width:100%;border:none;border-radius:var(--radius);padding:13px;cursor:pointer;
+    font-family:inherit;font-weight:800;font-size:.9rem;
+    background:linear-gradient(100deg,#f59f0a,#ffcf6b);color:#3a2706;
+  }
+  .toggle-notif{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    background:var(--panel2);border-radius:var(--radius);padding:13px 15px;margin-bottom:16px;
+  }
+  .toggle-notif .lib{font-size:.85rem;font-weight:700}
+  .toggle-notif .desc{font-size:.7rem;color:var(--muted);margin-top:2px}
+  .switch{position:relative;width:46px;height:26px;flex:none}
+  .switch input{opacity:0;width:0;height:0}
+  .slider{
+    position:absolute;inset:0;background:#c3cfda;border-radius:999px;cursor:pointer;transition:.25s;
+  }
+  .slider::before{
+    content:"";position:absolute;width:20px;height:20px;left:3px;top:3px;
+    background:#fff;border-radius:50%;transition:.25s;box-shadow:0 1px 3px rgba(0,0,0,.3);
+  }
+  .switch input:checked + .slider{background:var(--vigilance)}
+  .switch input:checked + .slider::before{transform:translateX(20px)}
+
+  /* Bannière notification de proximité */
+  .notif-banner{
+    position:absolute;top:92px;left:50%;transform:translateX(-50%) translateY(-12px);z-index:1500;
+    width:calc(100% - 28px);max-width:440px;
+    background:var(--panel);border:1px solid var(--vigilance);border-left:5px solid var(--vigilance);
+    border-radius:var(--radius);padding:11px 14px;
+    box-shadow:0 8px 26px rgba(30,50,70,.22);
+    display:flex;align-items:center;gap:11px;opacity:0;pointer-events:none;transition:.35s;
+  }
+  .notif-banner.on{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+  .notif-banner .ico-n{font-size:1.5rem;flex:none}
+  .notif-banner .txt{flex:1;min-width:0}
+  .notif-banner .titre{font-size:.82rem;font-weight:800}
+  .notif-banner .sstitre{font-size:.72rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .notif-banner .ferme{background:none;border:none;color:var(--muted);font-size:1.1rem;cursor:pointer;flex:none}
+  .indicatif{
+    background:var(--panel2);border:1.5px solid #d9e2ea;border-radius:var(--radius);
+    padding:11px 9px;color:var(--lagon);font-weight:700;font-size:.88rem;flex:none;
+    font-family:inherit;cursor:pointer;appearance:none;-webkit-appearance:none;
+  }
+  .indicatif:focus{outline:none;border-color:var(--lagon)}
+  .indicatif option{background:var(--panel2);color:var(--ink)}
+  .tel-ligne .champ{margin-bottom:0}
+  .code-ligne{display:none}
+  .code-ligne.on{display:block}
+  .auth-info{font-size:.72rem;color:var(--muted);margin-bottom:16px;line-height:1.5}
+
+  .toast{
+    position:absolute;top:90px;left:50%;transform:translateX(-50%) translateY(-8px);z-index:3000;
+    background:var(--panel);border:1px solid var(--ok);color:var(--ok);border-radius:999px;
+    padding:9px 18px;font-size:.8rem;font-weight:600;opacity:0;transition:.3s;pointer-events:none;white-space:nowrap;
+  }
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.err{border-color:var(--alerte);color:var(--alerte)}
+
+  .leaflet-control-attribution{background:rgba(255,255,255,.78)!important;color:#5a6675!important;font-size:.6rem!important}
+  .leaflet-control-attribution a{color:#5a6675!important}
+  .leaflet-control-zoom{display:none}
+  @media (prefers-reduced-motion: reduce){.halo,.dot{animation:none}}
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<header>
+  <div class="logo">
+    <b>DAKOU<span>ONE</span></b>
+    <small>Vigilance · Maore</small>
+  </div>
+  <div class="compteur"><span class="dot"></span><span id="nbActifs">0</span>&nbsp;signalements actifs</div>
+  <div class="points-pill" id="pointsPill">🪨 <span id="pointsVal">0</span></div>
+  <button class="profil" id="profilBtn" title="Mon compte">👤</button>
+</header>
+
+<div class="urgence">En danger immédiat&nbsp;? Appelez le <b>17</b> — ne vous approchez jamais.</div>
+<div class="mode-demo" id="modeDemoBadge">Mode démo local — Firebase non configuré (code SMS : 123456)</div>
+
+<div class="notif-banner" id="notifBanner">
+  <div class="ico-n" id="notifIco">🔔</div>
+  <div class="txt">
+    <div class="titre" id="notifTitre">Alerte à proximité</div>
+    <div class="sstitre" id="notifSstitre">—</div>
+  </div>
+  <button class="ferme" id="notifFerme">✕</button>
+</div>
+
+<button class="fab" id="ouvrirSignal">
+  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+  Signaler
+</button>
+
+<button class="locbtn" id="maPos" title="Ma position">
+  <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg>
+</button>
+
+<!-- Modal auth téléphone -->
+<div class="voile" id="voileAuth">
+  <div class="feuille">
+    <h2>Vérifie ton numéro</h2>
+    <p class="sous">Obligatoire pour publier un signalement. La carte reste consultable sans compte.</p>
+    <div class="label">Numéro de téléphone</div>
+    <div class="tel-ligne">
+      <select class="indicatif" id="indicatif">
+        <option value="+262" selected>🇾🇹 +262</option>
+        <option value="+33">🇫🇷 +33</option>
+        <option value="+269">🇰🇲 +269</option>
+        <option value="+261">🇲🇬 +261</option>
+        <option value="+230">🇲🇺 +230</option>
+        <option value="+32">🇧🇪 +32</option>
+        <option value="+41">🇨🇭 +41</option>
+        <option value="+1">🇺🇸 +1</option>
+        <option value="+44">🇬🇧 +44</option>
+      </select>
+      <input class="champ" id="telInput" type="tel" placeholder="639 XX XX XX" inputmode="numeric" autocomplete="tel">
+    </div>
+    <div class="code-ligne" id="codeLigne">
+      <div class="label">Code reçu par SMS</div>
+      <input class="champ" id="codeInput" type="text" placeholder="123456" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
+    </div>
+    <p class="auth-info">Ton numéro n'est jamais affiché publiquement. Il sert uniquement à responsabiliser les signalements.</p>
+    <div class="actions">
+      <button class="annuler" id="authAnnuler">Plus tard</button>
+      <button class="envoyer" id="btn-sms">Recevoir le code</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal signalement -->
+<div class="voile" id="voile">
+  <div class="feuille">
+    <h2>Nouveau signalement</h2>
+    <p class="sous">Touche la carte derrière pour placer le point, ou utilise ta position GPS.</p>
+    <div class="label">Type d'incident</div>
+    <div class="grille-types" id="types">
+      <button class="type-btn" data-t="coupeurs"><span class="ico">🛑</span>Coupeurs de route</button>
+      <button class="type-btn" data-t="rassemblement"><span class="ico">👥</span>Rassemblement anormal</button>
+      <button class="type-btn" data-t="caillassage"><span class="ico">⚠️</span>Caillassage</button>
+      <button class="type-btn" data-t="barrage"><span class="ico">🚧</span>Route bloquée</button>
+    </div>
+    <div class="label">Niveau de danger</div>
+    <div class="niveaux" id="niveaux">
+      <button class="niv" data-n="1">Prudence</button>
+      <button class="niv sel" data-n="2">Vigilance</button>
+      <button class="niv" data-n="3">Danger</button>
+    </div>
+    <div class="pos-info" id="posInfo">📍 Position : touche la carte ou le bouton GPS</div>
+    <textarea id="commentaire" placeholder="Détails utiles : nombre, direction, véhicules… (optionnel)" maxlength="180"></textarea>
+    <div class="photo-zone" id="photoZone">📷 Ajouter une photo (optionnel)</div>
+    <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
+    <p class="avert"><b>Ne prends jamais de risque pour une photo.</b> Uniquement de loin, depuis un lieu sûr. Les faux signalements sont retirés et sanctionnés.</p>
+    <div class="actions">
+      <button class="annuler" id="annuler">Annuler</button>
+      <button class="envoyer" id="envoyer" disabled>Publier l'alerte</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal profil -->
+<div class="voile" id="voileProfil">
+  <div class="feuille">
+    <div class="profil-tete">
+      <div class="profil-avatar">👤</div>
+      <div>
+        <div class="profil-nom" id="profilNom">—</div>
+        <div class="profil-points">🪨 <span id="profilPoints">0</span> point(s)</div>
+        <div class="statut-id non" id="statutId">Identité non vérifiée</div>
+      </div>
+    </div>
+
+    <div class="label">Nom affiché</div>
+    <div class="ligne-nom">
+      <input class="champ" id="nomInput" type="text" maxlength="20" placeholder="Ton pseudo">
+      <button id="nomSauver" disabled>OK</button>
+    </div>
+    <p class="hint-nom" id="hintNom">🔒 Le changement de nom est réservé aux comptes dont l'identité a été vérifiée.</p>
+
+    <button class="btn-verif-id" id="btnVerifId">🪪 Vérifier mon identité</button>
+
+    <!-- Bloc abonnement / notifications -->
+    <div class="toggle-notif" id="toggleNotifWrap" style="display:none">
+      <div>
+        <div class="lib">🔔 Alertes de proximité</div>
+        <div class="desc">Être prévenu des dangers près de moi</div>
+      </div>
+      <label class="switch"><input type="checkbox" id="notifSwitch"><span class="slider"></span></label>
+    </div>
+
+    <div class="carte-premium" id="cartePremium">
+      <h3>⭐ DAKOUONE Premium</h3>
+      <div class="prix">3,50 € <small>/ mois</small></div>
+      <ul>
+        <li>Notifications des signalements près de toi, en temps réel</li>
+        <li>Alerte avant même d'arriver sur la zone à risque</li>
+        <li>Rayon de surveillance personnalisable</li>
+        <li class="gratuit">Les dangers graves (niveau 3) restent notifiés gratuitement à tous</li>
+      </ul>
+      <button class="btn-premium" id="btnPremium">Passer en Premium</button>
+    </div>
+
+    <button class="btn-deco" id="btnDeco">Se déconnecter</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+/* ============================================================
+   DAKOUONE — version tout-en-un
+   • Config Firebase remplie  → mode CONNECTÉ (SMS réels, temps réel)
+   • Config non remplie       → MODE DÉMO local (tout marche, en mémoire)
+   ============================================================ */
+
+/* ---------- ⚙️ CONFIG — remplace par les valeurs de TON projet ---------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyAML4tjqax-9n308oxh7YtZSurWaLcsUwU",
+  authDomain: "dakouone-75a8e.firebaseapp.com",
+  projectId: "dakouone-75a8e",
+  storageBucket: "dakouone-75a8e.firebasestorage.app",
+  messagingSenderId: "1005193876059",
+  appId: "1:1005193876059:web:4b82cf94b45d66591c657e"
+};
+
+const MODE_DEMO = firebaseConfig.apiKey.includes("TA_CLE");
+const DUREE_VIE_MS = 2 * 60 * 60 * 1000;
+const RAYON_PROXIMITE_M = 500;     // il faut être à moins de 500 m pour signaler/valider
+const SEUIL_CONFIRMATION = 5;      // 5 validations citoyennes → signalement confirmé
+const RAYON_NOTIF_M = 3000;        // premium : notifié si un signalement tombe à moins de 3 km
+const PRIX_PREMIUM = "3,50 €";
+const TYPES = {
+  coupeurs:      { nom: "Coupeurs de route",     ico: "🛑" },
+  rassemblement: { nom: "Rassemblement anormal", ico: "👥" },
+  caillassage:   { nom: "Caillassage",           ico: "⚠️" },
+  barrage:       { nom: "Route bloquée",         ico: "🚧" }
+};
+
+/* ----- Géo : distance + position actuelle ----- */
+function distanceM(lat1, lng1, lat2, lng2) {
+  const R = 6371000, rad = Math.PI / 180;
+  const dLat = (lat2 - lat1) * rad, dLng = (lng2 - lng1) * rad;
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(lat1*rad) * Math.cos(lat2*rad) * Math.sin(dLng/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+function positionActuelle() {
+  return new Promise((res, rej) => {
+    if (!navigator.geolocation) return rej(new Error("no-geo"));
+    navigator.geolocation.getCurrentPosition(
+      (p) => res({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      rej, { enableHighAccuracy: true, timeout: 8000 }
+    );
+  });
+}
+
+/* Contrôle de proximité — simulé comme réussi en mode démo pour pouvoir tester */
+async function verifierProximite(latCible, lngCible, action) {
+  if (MODE_DEMO) return true;
+  try {
+    const pos = await positionActuelle();
+    const d = distanceM(pos.lat, pos.lng, latCible, lngCible);
+    if (d > RAYON_PROXIMITE_M) {
+      toast(`Trop loin (${(d/1000).toFixed(1)} km) — ${action} possible uniquement sur place`, true);
+      return false;
+    }
+    return true;
+  } catch {
+    toast("Active ta position GPS pour " + action, true);
+    return false;
+  }
+}
+
+function estConfirme(s) {
+  return !!s.verifiePar || (s.confirmations || 0) >= SEUIL_CONFIRMATION;
+}
+
+/* Firebase chargé dynamiquement UNIQUEMENT en mode connecté */
+let fb = null;
+if (!MODE_DEMO) {
+  const [appM, authM, fsM, stM] = await Promise.all([
+    import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"),
+    import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"),
+    import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"),
+    import("https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js")
+  ]);
+  const app = appM.initializeApp(firebaseConfig);
+  fb = {
+    ...authM, ...fsM, ...stM,
+    auth: authM.getAuth(app),
+    db: fsM.getFirestore(app),          // base (default) — sinon getFirestore(app,"nom")
+    storage: stM.getStorage(app)
+  };
+  fb.auth.languageCode = "fr";
+} else {
+  document.getElementById("modeDemoBadge").classList.add("on");
+}
+
+/* ============================================================
+   CARTE + secours hors-ligne
+   ============================================================ */
+const map = L.map("map", { zoomControl: false }).setView([-12.81, 45.16], 11);
+const tuiles = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+  attribution: "&copy; OpenStreetMap &copy; CARTO", maxZoom: 19
+}).addTo(map);
+
+let secoursActif = false;
+function activerSecours() {
+  if (secoursActif) return;
+  secoursActif = true;
+  const style = { color: "#0e9bb5", weight: 1.5, opacity: .55, fillColor: "#fdf8ec", fillOpacity: 1 };
+  L.polygon([
+    [-12.660,45.075],[-12.685,45.115],[-12.710,45.100],[-12.730,45.155],
+    [-12.760,45.190],[-12.780,45.227],[-12.840,45.215],[-12.920,45.190],
+    [-12.995,45.165],[-12.955,45.075],[-12.900,45.100],[-12.875,45.060],
+    [-12.830,45.100],[-12.800,45.060],[-12.745,45.050],[-12.700,45.060]
+  ], style).addTo(map);
+  L.polygon([
+    [-12.770,45.270],[-12.780,45.292],[-12.812,45.296],[-12.818,45.272],[-12.790,45.263]
+  ], style).addTo(map);
+  [["Mamoudzou",-12.7806,45.2278],["Koungou",-12.7335,45.1042],
+   ["Dembéni",-12.8410,45.1730],["Bouéni",-12.9030,45.0770],["Dzaoudzi",-12.7870,45.2820]]
+  .forEach(([nom, la, lo]) => {
+    L.marker([la, lo], { icon: L.divIcon({ className: "", html:
+      `<div style="font-size:.62rem;color:#5f6e7d;white-space:nowrap;transform:translate(-50%,-50%)">${nom}</div>`,
+      iconSize: [0, 0] }) }).addTo(map);
+  });
+  toast("Tuiles indisponibles : carte simplifiée");
+}
+tuiles.on("tileerror", activerSecours);
+setTimeout(() => { if (!document.querySelector(".leaflet-tile-loaded")) activerSecours(); }, 4000);
+
+/* ============================================================
+   AUTH TÉLÉPHONE — réel (Firebase) ou simulé (démo)
+   ============================================================ */
+let utilisateur = null;
+let confirmation = null;
+let recaptcha = null;
+
+/* ----- Profil : pseudo, points 🪨, identité ----- */
+let profil = null;          // { pseudo, points, identiteVerifiee }
+let stopProfil = null;      // unsubscribe Firestore
+
+function pseudoParDefaut() {
+  return "Citoyen-" + Math.random().toString(36).slice(2, 6).toUpperCase();
+}
+
+function majUIProfil() {
+  const pill = document.getElementById("pointsPill");
+  pill.classList.toggle("on", !!(utilisateur && profil));
+  if (profil) {
+    document.getElementById("pointsVal").textContent = profil.points || 0;
+    document.getElementById("profilNom").textContent = profil.pseudo || "—";
+    document.getElementById("profilPoints").textContent = profil.points || 0;
+    const st = document.getElementById("statutId");
+    const ok = !!profil.identiteVerifiee;
+    st.className = "statut-id " + (ok ? "oui" : "non");
+    st.textContent = ok ? "✓ Identité vérifiée" : "Identité non vérifiée";
+    document.getElementById("nomInput").disabled = !ok;
+    document.getElementById("nomSauver").disabled = !ok;
+    document.getElementById("hintNom").style.display = ok ? "none" : "block";
+    document.getElementById("btnVerifId").style.display = ok ? "none" : "block";
+
+    /* Premium : badge, masquage de l'offre, affichage du réglage notifications */
+    const prem = !!profil.premium;
+    const tete = document.querySelector(".profil-tete > div");
+    let badgeP = document.getElementById("badgePremium");
+    if (prem && !badgeP) {
+      badgeP = document.createElement("div");
+      badgeP.id = "badgePremium";
+      badgeP.className = "badge-premium";
+      badgeP.textContent = "⭐ Premium";
+      tete.appendChild(badgeP);
+    } else if (!prem && badgeP) badgeP.remove();
+
+    document.getElementById("cartePremium").style.display = prem ? "none" : "block";
+    document.getElementById("toggleNotifWrap").style.display = prem ? "flex" : "none";
+    document.getElementById("notifSwitch").checked = prem && profil.notifActives !== false;
+  }
+}
+
+function ecouterProfil(uid) {
+  if (MODE_DEMO) return;
+  if (stopProfil) stopProfil();
+  stopProfil = fb.onSnapshot(fb.doc(fb.db, "utilisateurs", uid), (d) => {
+    profil = d.data() || null;
+    majUIProfil();
+  });
+}
+
+function majProfil() {
+  const p = document.getElementById("profilBtn");
+  p.classList.toggle("ok", !!utilisateur);
+  p.textContent = utilisateur ? "✓" : "👤";
+  if (!utilisateur) { profil = null; if (stopProfil) { stopProfil(); stopProfil = null; } }
+  majUIProfil();
+}
+
+if (!MODE_DEMO) {
+  fb.onAuthStateChanged(fb.auth, (u) => {
+    utilisateur = u;
+    if (u) ecouterProfil(u.uid);
+    majProfil();
+  });
+}
+
+const voileAuth = document.getElementById("voileAuth");
+const btnSms = document.getElementById("btn-sms");
+const codeLigne = document.getElementById("codeLigne");
+
+function ouvrirAuth() {
+  voileAuth.classList.add("on");
+  codeLigne.classList.remove("on");
+  btnSms.textContent = "Recevoir le code";
+  confirmation = null;
+  if (!MODE_DEMO && !recaptcha) {
+    recaptcha = new fb.RecaptchaVerifier(fb.auth, "btn-sms", { size: "invisible" });
+  }
+}
+
+document.getElementById("authAnnuler").onclick = () => voileAuth.classList.remove("on");
+
+/* Placeholder adapté au pays choisi */
+const exemples = { "+262":"639 XX XX XX", "+33":"6 12 34 56 78", "+269":"3XX XX XX",
+                   "+261":"32 XX XXX XX", "+230":"5XXX XXXX", "+32":"4XX XX XX XX",
+                   "+41":"7X XXX XX XX", "+1":"555 123 4567", "+44":"7XXX XXXXXX" };
+document.getElementById("indicatif").onchange = (e) => {
+  document.getElementById("telInput").placeholder = exemples[e.target.value] || "Numéro";
+};
+
+document.getElementById("profilBtn").onclick = () => {
+  if (utilisateur) {
+    majUIProfil();
+    document.getElementById("nomInput").value = profil?.pseudo || "";
+    document.getElementById("voileProfil").classList.add("on");
+  } else ouvrirAuth();
+};
+
+/* ----- Actions du modal profil ----- */
+document.getElementById("voileProfil").addEventListener("click", (e) => {
+  if (e.target.id === "voileProfil") e.target.classList.remove("on");
+});
+
+document.getElementById("btnDeco").onclick = async () => {
+  if (!MODE_DEMO) await fb.signOut(fb.auth);
+  else { utilisateur = null; }
+  document.getElementById("voileProfil").classList.remove("on");
+  majProfil();
+  toast("Déconnecté");
+};
+
+document.getElementById("nomSauver").onclick = async () => {
+  const nom = document.getElementById("nomInput").value.trim();
+  if (nom.length < 3) { toast("3 caractères minimum", true); return; }
+  if (!profil?.identiteVerifiee) { toast("Identité non vérifiée", true); return; }
+  if (MODE_DEMO) {
+    profil.pseudo = nom;
+  } else {
+    await fb.updateDoc(fb.doc(fb.db, "utilisateurs", utilisateur.uid), { pseudo: nom });
+  }
+  majUIProfil();
+  toast("Nom mis à jour ✓");
+};
+
+document.getElementById("btnVerifId").onclick = async () => {
+  if (MODE_DEMO) {
+    /* Simulation du parcours Stripe Identity (CNI + selfie chez le prestataire) */
+    toast("Vérification en cours… (simulée)");
+    setTimeout(() => {
+      profil.identiteVerifiee = true;
+      majUIProfil();
+      toast("Identité vérifiée ✓ — tu peux changer de nom");
+    }, 1800);
+  } else {
+    /* Production : Cloud Function `creerSessionVerification` → URL Stripe Identity
+       → webhook → utilisateurs/{uid}.identiteVerifiee = true (voir architecture §3 bis) */
+    toast("Vérification d'identité : à brancher sur Stripe Identity", true);
+  }
+};
+
+/* ----- Premium : abonnement & réglage notifications ----- */
+document.getElementById("btnPremium").onclick = async () => {
+  if (MODE_DEMO) {
+    toast("Paiement Stripe… (simulé)");
+    setTimeout(async () => {
+      profil.premium = true;
+      profil.notifActives = true;
+      majUIProfil();
+      await activerNotifications();
+      toast("Bienvenue en Premium ⭐ — notifications activées 🔔");
+    }, 1600);
+  } else {
+    /* Production : Cloud Function `creerCheckoutPremium` → Stripe Checkout (abonnement 3,50€/mois)
+       → webhook Stripe → utilisateurs/{uid}.premium = true.
+       Le paiement ne transite JAMAIS par l'app (PCI-DSS géré par Stripe). */
+    toast("Abonnement : à brancher sur Stripe Checkout", true);
+  }
+};
+
+document.getElementById("notifSwitch").onchange = async (e) => {
+  const actif = e.target.checked;
+  if (MODE_DEMO) profil.notifActives = actif;
+  else await fb.updateDoc(fb.doc(fb.db, "utilisateurs", utilisateur.uid), { notifActives: actif });
+  if (actif) { await activerNotifications(); toast("Alertes de proximité activées 🔔"); }
+  else toast("Alertes de proximité désactivées");
+};
+
+document.getElementById("notifFerme").onclick = () =>
+  document.getElementById("notifBanner").classList.remove("on");
+
+/* Demande la permission navigateur pour les notifications système */
+async function activerNotifications() {
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "default") {
+    try { await Notification.requestPermission(); } catch {}
+  }
+}
+
+/* Affiche une notification de proximité (bannière in-app + notif système) */
+function notifierProximite(s, distance) {
+  const t = TYPES[s.type];
+  document.getElementById("notifIco").textContent = t.ico;
+  document.getElementById("notifTitre").textContent =
+    (s.niveau === 3 ? "⚠️ Danger à proximité" : "Signalement à proximité");
+  document.getElementById("notifSstitre").textContent =
+    `${t.nom} · à ${(distance / 1000).toFixed(1)} km`;
+  const banner = document.getElementById("notifBanner");
+  banner.classList.add("on");
+  clearTimeout(banner._timer);
+  banner._timer = setTimeout(() => banner.classList.remove("on"), 6000);
+
+  if ("Notification" in window && Notification.permission === "granted") {
+    try {
+      new Notification("DAKOUONE — " + (s.niveau === 3 ? "Danger à proximité" : "Signalement proche"),
+        { body: `${t.nom} à ${(distance / 1000).toFixed(1)} km`, tag: s.id });
+    } catch {}
+  }
+}
+
+/* Décide si un nouveau signalement doit déclencher une notification.
+   Règle : niveau 3 → tout le monde ; niveaux 1-2 → premium avec notifs activées. */
+const dejaNotifies = new Set();
+async function evaluerNotif(s) {
+  if (!utilisateur || dejaNotifies.has(s.id)) return;
+  if (s.creePar && s.creePar === utilisateur.uid) return;   // pas de notif pour ses propres alertes
+
+  const premiumActif = profil?.premium && profil?.notifActives !== false;
+  const niveau3 = s.niveau === 3;
+  if (!niveau3 && !premiumActif) return;                    // 1-2 réservés au premium
+
+  let pos;
+  try { pos = await positionActuelle(); }
+  catch { pos = MODE_DEMO ? { lat: -12.78, lng: 45.21 } : null; }   // démo : position Mamoudzou
+  if (!pos) return;
+
+  const d = distanceM(pos.lat, pos.lng, s.position.latitude, s.position.longitude);
+  if (d <= RAYON_NOTIF_M) {
+    dejaNotifies.add(s.id);
+    notifierProximite(s, d);
+  }
+}
+
+btnSms.onclick = async () => {
+  /* ----- Étape 2 : vérification du code ----- */
+  if (confirmation) {
+    const code = document.getElementById("codeInput").value.trim();
+    if (code.length < 6) { toast("Code à 6 chiffres requis", true); return; }
+    btnSms.disabled = true;
+    try {
+      if (MODE_DEMO) {
+        if (code !== "123456") throw new Error("code");
+        utilisateur = { uid: "demo-" + Math.random().toString(36).slice(2, 8) };
+        profil = { pseudo: pseudoParDefaut(), points: 0, identiteVerifiee: false,
+                   premium: false, notifActives: true };
+        majProfil();
+      } else {
+        const cred = await confirmation.confirm(code);
+        await fb.setDoc(fb.doc(fb.db, "utilisateurs", cred.user.uid), {
+          role: "citoyen", telephoneVerifie: true,
+          pseudo: pseudoParDefaut(), points: 0, identiteVerifiee: false,
+          premium: false, notifActives: true,
+          fiabilite: 0, banni: false, creeLe: fb.serverTimestamp()
+        }, { merge: true });
+      }
+      voileAuth.classList.remove("on");
+      confirmation = null;
+      toast("Numéro vérifié — karibu ! 🌴");
+    } catch (e) {
+      console.error(e);
+      toast("Code incorrect, réessaie", true);
+    }
+    btnSms.disabled = false;
+    return;
+  }
+
+  /* ----- Étape 1 : envoi du SMS ----- */
+  const indicatif = document.getElementById("indicatif").value;
+  let num = document.getElementById("telInput").value.replace(/[\s.\-()]/g, "");
+  if (num.startsWith("0")) num = num.slice(1);          // 0639… → 639…
+  if (num.startsWith("+")) num = "";                    // pas de double indicatif
+  if (!/^\d{6,12}$/.test(num)) { toast("Numéro invalide", true); return; }
+  const numeroComplet = indicatif + num;                // format E.164, ex. +33612345678
+  btnSms.disabled = true;
+  try {
+    if (MODE_DEMO) {
+      confirmation = { demo: true };
+      toast(`SMS simulé vers ${numeroComplet} 📩 — code : 123456`);
+    } else {
+      confirmation = await fb.signInWithPhoneNumber(fb.auth, numeroComplet, recaptcha);
+      toast("SMS envoyé 📩");
+    }
+    codeLigne.classList.add("on");
+    btnSms.textContent = "Valider le code";
+  } catch (e) {
+    console.error(e);
+    toast(e.code === "auth/too-many-requests"
+      ? "Trop de tentatives, patiente un peu" : "Échec d'envoi du SMS", true);
+    if (recaptcha) { recaptcha.clear(); recaptcha = null; }
+    if (!MODE_DEMO) recaptcha = new fb.RecaptchaVerifier(fb.auth, "btn-sms", { size: "invisible" });
+  }
+  btnSms.disabled = false;
+};
+
+/* ============================================================
+   DONNÉES — temps réel Firestore ou mémoire locale
+   ============================================================ */
+const marqueurs = {};
+
+function estExpire(s) {
+  const exp = s.expireLe?.toMillis ? s.expireLe.toMillis() : s.expireLe;
+  return exp && exp < Date.now();
+}
+
+if (!MODE_DEMO) {
+  /* ----- Mode connecté : onSnapshot ----- */
+  const q = fb.query(
+    fb.collection(fb.db, "signalements"),
+    fb.where("statut", "in", ["actif", "confirme", "verifie"])
+  );
+  fb.onSnapshot(q, (snap) => {
+    snap.docChanges().forEach((ch) => {
+      const id = ch.doc.id;
+      const s = { id, ...ch.doc.data() };
+      if (ch.type === "removed" || estExpire(s)) { retirerMarqueur(id); return; }
+      if (ch.type === "added") { ajouterMarqueur(s); evaluerNotif(s); }
+      if (ch.type === "modified") { retirerMarqueur(id); ajouterMarqueur(s); }
+    });
+    majCompteur();
+  }, (err) => {
+    console.error("Firestore:", err);
+    toast("Connexion temps réel perdue", true);
+  });
+} else {
+  /* ----- Mode démo : signalements en mémoire + jeu de démonstration ----- */
+  const photoDemo = "data:image/svg+xml," + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120">
+      <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#1c2a3a"/><stop offset=".55" stop-color="#27435c"/>
+        <stop offset=".55" stop-color="#3a3127"/><stop offset="1" stop-color="#191510"/>
+      </linearGradient></defs>
+      <rect width="120" height="120" fill="url(#g)"/>
+      <circle cx="92" cy="22" r="11" fill="#ffb020" opacity=".85"/>
+      <rect x="14" y="66" width="92" height="7" rx="3" fill="#0d1117"/>
+      <rect x="30" y="60" width="10" height="10" fill="#ff5340"/>
+      <rect x="62" y="60" width="10" height="10" fill="#ff5340"/>
+    </svg>`);
+
+  let idSeq = 1;
+  [
+    { type:"coupeurs", niveau:3, lat:-12.7530, lng:45.1110, com:"Plusieurs individus, pierres sur la chaussée, sens Koungou → Mamoudzou", age:18, conf:7, verif:"Gendarmerie", photo:photoDemo, auteur:"Madi976" },
+    { type:"rassemblement", niveau:2, lat:-12.7842, lng:45.2278, com:"Groupe important près du rond-point, ambiance tendue", age:42, conf:4, verif:null, photo:null, auteur:"Citoyen-K2F7" },
+    { type:"barrage", niveau:2, lat:-12.8410, lng:45.1130, com:"Pneus sur la route, circulation alternée", age:65, conf:5, verif:"Gendarmerie", photo:null, auteur:"Zaza_976" },
+    { type:"caillassage", niveau:3, lat:-12.7350, lng:45.0860, com:"Véhicules visés depuis le talus, rouler vitres fermées", age:25, conf:9, verif:null, photo:photoDemo, auteur:"Citoyen-9XPL" },
+    { type:"rassemblement", niveau:1, lat:-12.9090, lng:45.1330, com:"Petit groupe observé, rien de confirmé", age:80, conf:1, verif:null, photo:null, auteur:"Anli.M" }
+  ].forEach(d => {
+    ajouterMarqueur({
+      id: "demo" + (idSeq++), type: d.type, niveau: d.niveau,
+      position: { latitude: d.lat, longitude: d.lng },
+      commentaire: d.com, photoUrl: d.photo, verifiePar: d.verif,
+      auteurPseudo: d.auteur,
+      creeLe: Date.now() - d.age * 60000,
+      expireLe: Date.now() - d.age * 60000 + DUREE_VIE_MS,
+      confirmations: d.conf, infirmations: 0
+    });
+  });
+  majCompteur();
+}
+
+/* Balayage local des expirés */
+setInterval(() => {
+  Object.entries(marqueurs).forEach(([id, m]) => {
+    if (m._dak && estExpire(m._dak)) retirerMarqueur(id);
+  });
+  majCompteur();
+}, 30000);
+
+function majCompteur() {
+  document.getElementById("nbActifs").textContent = Object.keys(marqueurs).length;
+}
+
+/* ============================================================
+   MARQUEURS — bulle photo Snap Map ou pin classique
+   ============================================================ */
+function iconePour(s) {
+  const pastille = s.verifiePar ? '<div class="verif-pastille">✓</div>' : "";
+  if (s.photoUrl) {
+    return L.divIcon({
+      className: "",
+      html: `<div class="bulle n${s.niveau}">
+               ${pastille}
+               <div class="cadre"><img src="${s.photoUrl}" alt="" loading="lazy"></div>
+               <div class="mini-ico">${TYPES[s.type].ico}</div>
+               <div class="pointe"></div>
+             </div>`,
+      iconSize: [56, 66], iconAnchor: [28, 66], popupAnchor: [0, -62]
+    });
+  }
+  return L.divIcon({
+    className: "",
+    html: `<div class="marq n${s.niveau}"><div class="halo"></div>${pastille}<div class="pin">${TYPES[s.type].ico}</div></div>`,
+    iconSize: [38, 38], iconAnchor: [19, 19], popupAnchor: [0, -20]
+  });
+}
+
+function popupPour(s) {
+  const cree = s.creeLe?.toMillis ? s.creeLe.toMillis() : s.creeLe;
+  const expire = s.expireLe?.toMillis ? s.expireLe.toMillis() : s.expireLe;
+  const reste = Math.max(0, Math.round((expire - Date.now()) / 60000));
+  const badge = s.verifiePar
+    ? `<div class="badge-verif">Vérifié ${s.verifiePar}</div>`
+    : (estConfirme(s)
+        ? `<div class="badge-verif" style="border-color:var(--ok);color:var(--ok);background:rgba(53,201,142,.12)">Confirmé par la communauté</div>`
+        : "");
+  const auteur = s.auteurPseudo ? ` · par ${echap(s.auteurPseudo)}` : "";
+  const jauge = estConfirme(s)
+    ? `✓ ${s.confirmations || 0} confirmation${(s.confirmations||0) > 1 ? "s" : ""}`
+    : `⏳ ${s.confirmations || 0}/${SEUIL_CONFIRMATION} validations — valide sur place si tu y es`;
+  return `
+    <div class="pop-type">${TYPES[s.type].ico} ${TYPES[s.type].nom}</div>
+    <div class="pop-meta">${tempsEcoule(cree)} · expire dans ${reste} min${auteur}</div>
+    ${badge}
+    ${s.photoUrl ? `<img class="pop-photo" src="${s.photoUrl}" alt="photo du signalement">` : ""}
+    ${s.commentaire ? `<div class="pop-com">${echap(s.commentaire)}</div>` : ""}
+    <div class="pop-conf">${jauge}</div>
+    <div class="pop-btns">
+      <button class="b-encore" data-vote="confirme" data-id="${s.id}">Toujours là</button>
+      <button class="b-fini" data-vote="infirme" data-id="${s.id}">C'est terminé</button>
+    </div>`;
+}
+
+function ajouterMarqueur(s) {
+  if (marqueurs[s.id]) return;
+  const m = L.marker([s.position.latitude, s.position.longitude], { icon: iconePour(s) }).addTo(map);
+  m._dak = s;
+  m.bindPopup(() => popupPour(m._dak));
+  marqueurs[s.id] = m;
+}
+
+function retirerMarqueur(id) {
+  const m = marqueurs[id];
+  if (m) { map.removeLayer(m); delete marqueurs[id]; }
+}
+
+/* ----- Votes ----- */
+const votesDemoFaits = new Set();
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-vote]");
+  if (!b) return;
+  if (!utilisateur) { ouvrirAuth(); return; }
+
+  const id = b.dataset.id, sens = b.dataset.vote;
+  const s = marqueurs[id]?._dak;
+  if (s?.verifiePar && sens === "infirme") {
+    toast("Signalement officiel — levée réservée à la " + s.verifiePar);
+    map.closePopup(); return;
+  }
+
+  /* 📍 Validation/levée uniquement à proximité du lieu */
+  const ok = await verifierProximite(
+    s.position.latitude, s.position.longitude,
+    sens === "confirme" ? "valider" : "lever le signalement");
+  if (!ok) return;
+
+  if (MODE_DEMO) {
+    if (votesDemoFaits.has(id)) { toast("Tu as déjà voté sur ce signalement", true); return; }
+    votesDemoFaits.add(id);
+    if (sens === "confirme") {
+      const dejaConfirme = estConfirme(s);
+      s.confirmations = (s.confirmations || 0) + 1;
+      if (!dejaConfirme && estConfirme(s)) {
+        /* 🎉 Seuil de 5 atteint → signalement confirmé, l'auteur gagne son caillou */
+        if (s.creePar && utilisateur && s.creePar === utilisateur.uid) {
+          profil.points = (profil.points || 0) + 1;
+          majUIProfil();
+          toast("Signalement confirmé — +1 🪨 pour toi !");
+        } else {
+          toast("Signalement confirmé par la communauté ✓");
+        }
+        map.closePopup();
+        return;
+      }
+    } else {
+      s.infirmations = (s.infirmations || 0) + 1;
+      if (s.infirmations - s.confirmations >= 3 || s.confirmations === 0) retirerMarqueur(id);
+    }
+    majCompteur();
+    map.closePopup();
+    toast(sens === "confirme" ? "Merci — validation enregistrée ✓" : "Vote enregistré — asante !");
+    return;
+  }
+
+  try {
+    /* Position du votant enregistrée avec le vote : la Cloud Function re-vérifie
+       la distance côté serveur (le client seul n'est jamais une preuve) */
+    const pos = await positionActuelle();
+    await fb.setDoc(fb.doc(fb.db, "signalements", id, "votes", utilisateur.uid),
+      { sens, date: fb.serverTimestamp(),
+        position: new fb.GeoPoint(pos.lat, pos.lng) });
+    map.closePopup();
+    toast(sens === "confirme" ? "Merci — validation enregistrée ✓" : "Vote enregistré — asante !");
+  } catch {
+    toast("Tu as déjà voté sur ce signalement", true);
+  }
+});
+
+/* ============================================================
+   PUBLICATION
+   ============================================================ */
+const voile = document.getElementById("voile");
+let choixType = null, choixNiveau = 2, choixPos = null, fichierPhoto = null, photoDataUrl = null;
+let marqueurTemp = null;
+
+document.getElementById("ouvrirSignal").onclick = () => {
+  if (!utilisateur) { ouvrirAuth(); return; }
+  voile.classList.add("on");
+  verifEnvoi();
+};
+document.getElementById("annuler").onclick = fermerModal;
+
+function fermerModal() {
+  voile.classList.remove("on");
+  choixType = null; choixPos = null; fichierPhoto = null; photoDataUrl = null;
+  document.querySelectorAll(".type-btn").forEach(b => b.classList.remove("sel"));
+  document.getElementById("commentaire").value = "";
+  document.getElementById("photoZone").innerHTML = "📷 Ajouter une photo (optionnel)";
+  document.getElementById("posInfo").textContent = "📍 Position : touche la carte ou le bouton GPS";
+  if (marqueurTemp) { map.removeLayer(marqueurTemp); marqueurTemp = null; }
+}
+
+document.getElementById("types").addEventListener("click", (e) => {
+  const b = e.target.closest(".type-btn"); if (!b) return;
+  document.querySelectorAll(".type-btn").forEach(x => x.classList.remove("sel"));
+  b.classList.add("sel"); choixType = b.dataset.t; verifEnvoi();
+});
+
+document.getElementById("niveaux").addEventListener("click", (e) => {
+  const b = e.target.closest(".niv"); if (!b) return;
+  document.querySelectorAll(".niv").forEach(x => x.classList.remove("sel"));
+  b.classList.add("sel"); choixNiveau = +b.dataset.n;
+});
+
+map.on("click", (e) => {
+  choixPos = e.latlng;
+  if (marqueurTemp) map.removeLayer(marqueurTemp);
+  marqueurTemp = L.circleMarker(e.latlng, { radius: 9, color: "#ffb020", weight: 2, fillOpacity: .3 }).addTo(map);
+  document.getElementById("posInfo").textContent =
+    `📍 Position choisie : ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+  if (utilisateur && !voile.classList.contains("on")) voile.classList.add("on");
+  verifEnvoi();
+});
+
+document.getElementById("maPos").onclick = () => {
+  if (!navigator.geolocation) { toast("GPS non disponible", true); return; }
+  navigator.geolocation.getCurrentPosition((p) => {
+    const ll = L.latLng(p.coords.latitude, p.coords.longitude);
+    map.setView(ll, 14);
+    choixPos = ll;
+    if (marqueurTemp) map.removeLayer(marqueurTemp);
+    marqueurTemp = L.circleMarker(ll, { radius: 9, color: "#0e9bb5", weight: 2, fillOpacity: .3 }).addTo(map);
+    document.getElementById("posInfo").textContent = "📍 Position GPS détectée ✓";
+    verifEnvoi();
+  }, () => toast("Position refusée ou indisponible", true));
+};
+
+/* Photo : compression client (≤ 800 px, JPEG 70 %) */
+const photoInput = document.getElementById("photoInput");
+document.getElementById("photoZone").onclick = () => photoInput.click();
+photoInput.onchange = () => {
+  const f = photoInput.files[0]; if (!f) return;
+  compresser(f).then((blob) => {
+    fichierPhoto = blob;
+    photoDataUrl = URL.createObjectURL(blob);
+    document.getElementById("photoZone").innerHTML = `<img src="${photoDataUrl}" alt="aperçu">`;
+  });
+};
+
+function compresser(fichier, maxDim = 800, qualite = 0.7) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const ratio = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * ratio);
+      c.height = Math.round(img.height * ratio);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob(resolve, "image/jpeg", qualite);
+    };
+    img.src = URL.createObjectURL(fichier);
+  });
+}
+
+function verifEnvoi() {
+  document.getElementById("envoyer").disabled = !(choixType && choixPos);
+}
+
+document.getElementById("envoyer").onclick = async () => {
+  if (!choixType || !choixPos || !utilisateur) return;
+  const btn = document.getElementById("envoyer");
+  btn.disabled = true; btn.textContent = "Publication…";
+
+  /* 📍 On ne peut signaler que si on est (ou vient de passer) sur place */
+  const ok = await verifierProximite(choixPos.lat, choixPos.lng, "signaler");
+  if (!ok) { btn.disabled = false; btn.textContent = "Publier l'alerte"; return; }
+
+  try {
+    if (MODE_DEMO) {
+      ajouterMarqueur({
+        id: "local" + Date.now(), type: choixType, niveau: choixNiveau,
+        position: { latitude: choixPos.lat, longitude: choixPos.lng },
+        commentaire: document.getElementById("commentaire").value.trim(),
+        photoUrl: photoDataUrl, verifiePar: null,
+        auteurPseudo: profil?.pseudo || "Citoyen",
+        creePar: utilisateur.uid,
+        creeLe: Date.now(), expireLe: Date.now() + DUREE_VIE_MS,
+        confirmations: 0, infirmations: 0
+      });
+      majCompteur();
+      /* 🪨 Pas de point immédiat : il sera gagné si 5 citoyens valident
+         ou si la gendarmerie confirme */
+
+      /* DÉMO : simule une alerte entrante d'un autre utilisateur ~3 s après,
+         pour montrer la notification de proximité (premium ou niveau 3) */
+      if (profil?.premium || choixNiveau === 3) {
+        setTimeout(() => {
+          const faux = {
+            id: "incoming" + Date.now(), type: "rassemblement", niveau: 2,
+            position: { latitude: choixPos.lat + 0.012, longitude: choixPos.lng + 0.008 },
+            commentaire: "Attroupement signalé par un autre utilisateur",
+            photoUrl: null, verifiePar: null, auteurPseudo: "Halima.M",
+            creePar: "autre-user",
+            creeLe: Date.now(), expireLe: Date.now() + DUREE_VIE_MS,
+            confirmations: 1, infirmations: 0
+          };
+          ajouterMarqueur(faux);
+          majCompteur();
+          evaluerNotif(faux);
+        }, 3000);
+      }
+    } else {
+      let photoUrl = null;
+      if (fichierPhoto) {
+        const ref = fb.ref(fb.storage, `signalements/${utilisateur.uid}_${Date.now()}.jpg`);
+        await fb.uploadBytes(ref, fichierPhoto, { contentType: "image/jpeg" });
+        photoUrl = await fb.getDownloadURL(ref);
+      }
+      await fb.addDoc(fb.collection(fb.db, "signalements"), {
+        type: choixType, niveau: choixNiveau,
+        position: new fb.GeoPoint(choixPos.lat, choixPos.lng),
+        commentaire: document.getElementById("commentaire").value.trim(),
+        photoUrl, creePar: utilisateur.uid,
+        auteurPseudo: profil?.pseudo || "Citoyen",
+        creeLe: fb.serverTimestamp(),
+        expireLe: fb.Timestamp.fromMillis(Date.now() + DUREE_VIE_MS),
+        statut: "actif", verifiePar: null,
+        confirmations: 0, infirmations: 0
+      });
+      /* 🪨 Le point est attribué par la Cloud Function quand le signalement
+         passe en "confirme" (5 validations) ou "verifie" (forces de l'ordre) */
+    }
+    fermerModal();
+    toast("Alerte publiée sur DAKOUONE 🌴");
+  } catch (e) {
+    console.error(e);
+    toast("Échec de publication, réessaie", true);
+  }
+  btn.disabled = false; btn.textContent = "Publier l'alerte";
+};
+
+/* ============================================================
+   UTILITAIRES
+   ============================================================ */
+function tempsEcoule(ts) {
+  const m = Math.round((Date.now() - ts) / 60000);
+  if (m < 1) return "à l'instant";
+  if (m < 60) return `il y a ${m} min`;
+  return `il y a ${Math.floor(m / 60)} h ${m % 60} min`;
+}
+
+function echap(t) {
+  const d = document.createElement("div");
+  d.textContent = t;
+  return d.innerHTML;
+}
+
+let toastTimer;
+function toast(msg, erreur = false) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.toggle("err", erreur);
+  t.classList.add("on");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("on"), 2800);
+}
+</script>
+</body>
+</html>
