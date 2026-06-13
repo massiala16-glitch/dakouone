@@ -65,14 +65,6 @@
     overflow:visible;
   }
   .fab:active{transform:translateX(-50%) scale(.95)}
-  .fab .anneau{
-    position:absolute;inset:-6px;border-radius:999px;pointer-events:none;
-    background:conic-gradient(var(--alerte) var(--p,0deg), transparent 0deg);
-    opacity:0;transition:opacity .15s;
-    -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
-            mask:radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
-  }
-  .fab.presse .anneau{opacity:1}
   .locbtn{
     position:absolute;bottom:30px;right:16px;z-index:1000;width:46px;height:46px;border-radius:50%;
     border:1px solid #d9e2ea;background:var(--panel);color:var(--lagon);cursor:pointer;
@@ -179,6 +171,36 @@
   textarea:focus,.champ:focus{outline:none;border-color:var(--lagon)}
   .photo-zone{border:1.5px dashed #d9e2ea;border-radius:var(--radius);padding:13px;text-align:center;color:var(--muted);font-size:.78rem;cursor:pointer;margin-bottom:7px}
   .photo-zone img{max-width:100%;max-height:110px;border-radius:9px}
+
+  /* ----- Enregistrement vocal (formulaire) ----- */
+  .voix-zone{
+    display:flex;align-items:center;gap:11px;border:1.5px dashed #d9e2ea;border-radius:var(--radius);
+    padding:11px 13px;margin-bottom:7px;
+  }
+  .voix-btn{
+    width:42px;height:42px;border-radius:50%;border:none;flex:none;cursor:pointer;
+    background:rgba(255,83,64,.12);color:var(--alerte);font-size:1.1rem;
+    display:flex;align-items:center;justify-content:center;transition:transform .12s;
+  }
+  .voix-btn:active{transform:scale(.92)}
+  .voix-btn.rec{background:var(--alerte);color:#fff;animation:pulseRec 1s ease-in-out infinite}
+  @keyframes pulseRec{0%,100%{box-shadow:0 0 0 0 rgba(255,83,64,.5)}50%{box-shadow:0 0 0 8px rgba(255,83,64,0)}}
+  .voix-info{flex:1;min-width:0;font-size:.78rem;color:var(--muted)}
+  .voix-info b{color:var(--ink)}
+  .voix-suppr{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;flex:none}
+
+  /* ----- Lecteur vocal (popup) ----- */
+  .pop-voix{
+    display:flex;align-items:center;gap:9px;background:var(--panel2);border-radius:10px;
+    padding:9px 11px;margin-bottom:9px;
+  }
+  .pop-voix button{
+    width:34px;height:34px;border-radius:50%;border:none;flex:none;cursor:pointer;
+    background:var(--lagon);color:#fff;font-size:.9rem;display:flex;align-items:center;justify-content:center;
+  }
+  .pop-voix button:disabled{background:#c3cfda;cursor:not-allowed}
+  .pop-voix .vinfo{font-size:.72rem;color:var(--muted);line-height:1.3}
+  .pop-voix .vinfo b{color:var(--ink);font-size:.78rem}
   .avert{font-size:.68rem;color:var(--muted);margin-bottom:16px;line-height:1.45}
   .avert b{color:var(--vigilance)}
   .pos-info{background:var(--panel2);border-radius:10px;padding:9px 12px;font-size:.76rem;color:var(--lagon);margin-bottom:16px;display:flex;align-items:center;gap:8px}
@@ -335,7 +357,6 @@
 </div>
 
 <button class="fab" id="ouvrirSignal">
-  <div class="anneau"></div>
   <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
   Signaler
 </button>
@@ -398,6 +419,12 @@
     <textarea id="commentaire" placeholder="Détails utiles : nombre, direction, véhicules… (optionnel)" maxlength="180"></textarea>
     <div class="photo-zone" id="photoZone">📷 Ajouter une photo (optionnel)</div>
     <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
+
+    <div class="voix-zone">
+      <button type="button" class="voix-btn" id="voixBtn" title="Enregistrer un vocal">🎙️</button>
+      <div class="voix-info" id="voixInfo">Commentaire vocal (optionnel) — 1 min max, écoutable 3 fois</div>
+      <button type="button" class="voix-suppr" id="voixSuppr" style="display:none" title="Supprimer">✕</button>
+    </div>
     <p class="avert"><b>Ne prends jamais de risque pour une photo.</b> Uniquement de loin, depuis un lieu sûr. Les faux signalements sont retirés et sanctionnés.</p>
     <div class="actions">
       <button class="annuler" id="annuler">Annuler</button>
@@ -875,6 +902,15 @@ btnSms.onclick = async () => {
    ============================================================ */
 const marqueurs = {};
 
+/* Compteur d'écoutes des vocaux, par appareil (3 max).
+   Persisté dans localStorage si disponible, sinon en mémoire de session. */
+let ecoutesVocal = {};
+try { ecoutesVocal = JSON.parse(localStorage.getItem("dak_ecoutes") || "{}"); } catch {}
+function sauverEcoutes() {
+  try { localStorage.setItem("dak_ecoutes", JSON.stringify(ecoutesVocal)); } catch {}
+}
+let audioEnCours = null;
+
 function estExpire(s) {
   const exp = s.expireLe?.toMillis ? s.expireLe.toMillis() : s.expireLe;
   return exp && exp < Date.now();
@@ -1003,12 +1039,20 @@ function popupPour(s) {
   const estMien = utilisateur && s.creePar === utilisateur.uid;
   const btnSuppr = estMien
     ? `<button class="b-suppr" data-suppr="${s.id}">🗑️ Supprimer mon signalement</button>` : "";
+  const ecoutes = ecoutesVocal[s.id] || 0;
+  const restantes = Math.max(0, 3 - ecoutes);
+  const blocVoix = s.voixUrl
+    ? `<div class="pop-voix">
+         <button data-voix="${s.id}" ${restantes === 0 ? "disabled" : ""}>▶︎</button>
+         <div class="vinfo"><b>Commentaire vocal</b><br>${restantes > 0 ? restantes + " écoute(s) restante(s)" : "Plus d'écoute disponible"}</div>
+       </div>` : "";
   return `
     <div class="pop-type">${TYPES[s.type].ico} ${TYPES[s.type].nom}</div>
     <div class="pop-meta">${tempsEcoule(cree)} · expire dans ${reste} min${auteur}</div>
     ${badge}
     ${s.photoUrl ? `<img class="pop-photo" src="${s.photoUrl}" alt="photo du signalement">` : ""}
     ${s.commentaire ? `<div class="pop-com">${echap(s.commentaire)}</div>` : ""}
+    ${blocVoix}
     <div class="pop-conf">${jauge}</div>
     <div class="pop-btns">
       <button class="b-encore" data-vote="confirme" data-id="${s.id}">Toujours là</button>
@@ -1119,11 +1163,50 @@ document.addEventListener("click", async (e) => {
   }
 });
 
+/* Lecture d'un commentaire vocal — max 3 écoutes par appareil */
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-voix]");
+  if (!b) return;
+  const id = b.dataset.voix;
+  const s = marqueurs[id]?._dak;
+  if (!s || !s.voixUrl) return;
+
+  const ecoutes = ecoutesVocal[id] || 0;
+  if (ecoutes >= 3) { toast("Plus d'écoute disponible pour ce vocal", true); return; }
+
+  // Coupe un éventuel audio déjà en cours
+  if (audioEnCours) { audioEnCours.pause(); audioEnCours = null; }
+
+  const audio = new Audio(s.voixUrl);
+  audioEnCours = audio;
+  b.disabled = true;
+  b.textContent = "♪";
+  audio.play().then(() => {
+    // Écoute comptée seulement si la lecture démarre vraiment
+    ecoutesVocal[id] = ecoutes + 1;
+    sauverEcoutes();
+  }).catch(() => { toast("Lecture impossible", true); b.disabled = false; b.textContent = "▶︎"; });
+
+  audio.onended = () => {
+    audioEnCours = null;
+    const reste = 3 - (ecoutesVocal[id] || 0);
+    // Met à jour le popup ouvert
+    const vinfo = b.parentElement.querySelector(".vinfo");
+    if (vinfo) vinfo.innerHTML = reste > 0
+      ? `<b>Commentaire vocal</b><br>${reste} écoute(s) restante(s)`
+      : `<b>Commentaire vocal</b><br>Plus d'écoute disponible`;
+    if (reste > 0) { b.disabled = false; b.textContent = "▶︎"; }
+    else { b.disabled = true; b.textContent = "▶︎"; toast("C'était ta dernière écoute"); }
+  };
+});
+
 /* ============================================================
    PUBLICATION
    ============================================================ */
 const voile = document.getElementById("voile");
 let choixType = null, choixNiveau = 2, choixPos = null, fichierPhoto = null, photoDataUrl = null;
+let fichierVoix = null, voixDataUrl = null;   // commentaire vocal
+let mediaRec = null, mediaChunks = [], recTimer = null, recDebut = 0;
 let marqueurTemp = null;
 
 document.getElementById("ouvrirSignal").onclick = () => {
@@ -1131,77 +1214,15 @@ document.getElementById("ouvrirSignal").onclick = () => {
   voile.classList.add("on");
   verifEnvoi();
 };
-
-/* Appui long sur "Signaler" → prend la position GPS et ouvre directement,
-   prêt à publier (raccourci quand on est sur place). */
-(function appuiLong() {
-  const fab = document.getElementById("ouvrirSignal");
-  const anneau = fab.querySelector(".anneau");
-  let timer = null, raf = null, debut = 0, declenche = false;
-  const DUREE = 800; // ms à maintenir
-
-  function start(e) {
-    if (!utilisateur) return;            // le clic normal gérera l'ouverture de l'auth
-    declenche = false;
-    debut = performance.now();
-    fab.classList.add("presse");
-    const anime = () => {
-      const p = Math.min(1, (performance.now() - debut) / DUREE);
-      anneau.style.setProperty("--p", (p * 360) + "deg");
-      if (p < 1) raf = requestAnimationFrame(anime);
-    };
-    raf = requestAnimationFrame(anime);
-    timer = setTimeout(async () => {
-      declenche = true;
-      fin();
-      // Appui long validé : on récupère la position GPS et on ouvre prêt à publier
-      try {
-        const pos = await positionActuelle();
-        const ll = L.latLng(pos.lat, pos.lng);
-        map.setView(ll, 15);
-        choixPos = ll;
-        if (marqueurTemp) map.removeLayer(marqueurTemp);
-        marqueurTemp = L.circleMarker(ll, { radius: 9, color: "#2bb3c8", weight: 2, fillOpacity: .3 }).addTo(map);
-        document.getElementById("posInfo").textContent = "📍 Ta position GPS ✓ (appui long)";
-      } catch {
-        if (MODE_DEMO) {
-          choixPos = L.latLng(-12.78, 45.22);
-          document.getElementById("posInfo").textContent = "📍 Position simulée (démo)";
-        } else {
-          toast("Active ta position GPS pour l'appui long", true);
-        }
-      }
-      voile.classList.add("on");
-      verifEnvoi();
-      if (navigator.vibrate) navigator.vibrate(30);
-    }, DUREE);
-  }
-
-  function fin() {
-    clearTimeout(timer);
-    cancelAnimationFrame(raf);
-    fab.classList.remove("presse");
-    anneau.style.setProperty("--p", "0deg");
-  }
-
-  // Souris + tactile. preventDefault sur touchstart évite le double-déclenchement.
-  fab.addEventListener("mousedown", start);
-  fab.addEventListener("mouseup", fin);
-  fab.addEventListener("mouseleave", fin);
-  fab.addEventListener("touchstart", (e) => { e.preventDefault(); start(e); }, { passive: false });
-  fab.addEventListener("touchend", (e) => {
-    if (declenche) { e.preventDefault(); }   // l'appui long a déjà agi : on bloque le clic
-    else if (utilisateur || true) {           // appui court → comportement normal (onclick)
-      // onclick se déclenchera naturellement si ce n'était pas un long press
-    }
-    fin();
-  });
-})();
 document.getElementById("annuler").onclick = fermerModal;
 
 function fermerModal() {
   voile.classList.remove("on");
   choixType = null; choixPos = null; fichierPhoto = null; photoDataUrl = null;
+  arreterVoix(); fichierVoix = null; voixDataUrl = null;
+  voixBtn.textContent = "🎙️"; voixBtn.classList.remove("rec");
+  voixInfo.innerHTML = "Commentaire vocal (optionnel) — 1 min max, écoutable 3 fois";
+  voixSuppr.style.display = "none";
   document.querySelectorAll(".type-btn").forEach(b => b.classList.remove("sel"));
   document.getElementById("commentaire").value = "";
   document.getElementById("photoZone").innerHTML = "📷 Ajouter une photo (optionnel)";
@@ -1227,8 +1248,9 @@ map.on("click", (e) => {
   marqueurTemp = L.circleMarker(e.latlng, { radius: 9, color: "#ffb020", weight: 2, fillOpacity: .3 }).addTo(map);
   document.getElementById("posInfo").textContent =
     `📍 Position choisie : ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
-  if (utilisateur && !voile.classList.contains("on")) voile.classList.add("on");
   verifEnvoi();
+  // Le clic sur la carte ne fait QUE placer le point.
+  // L'ouverture du formulaire se fait uniquement via le bouton Signaler.
 });
 
 document.getElementById("maPos").onclick = () => {
@@ -1271,6 +1293,60 @@ function compresser(fichier, maxDim = 800, qualite = 0.7) {
   });
 }
 
+/* ----- Commentaire vocal (MediaRecorder, 1 min max) ----- */
+const DUREE_VOIX_MAX = 60; // secondes
+const voixBtn = document.getElementById("voixBtn");
+const voixInfo = document.getElementById("voixInfo");
+const voixSuppr = document.getElementById("voixSuppr");
+
+voixBtn.onclick = async () => {
+  if (mediaRec && mediaRec.state === "recording") { arreterVoix(); return; }
+  if (fichierVoix) return;   // déjà un enregistrement : il faut le supprimer d'abord
+  if (!navigator.mediaDevices?.getUserMedia) { toast("Micro non disponible", true); return; }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaChunks = [];
+    mediaRec = new MediaRecorder(stream);
+    mediaRec.ondataavailable = (e) => { if (e.data.size) mediaChunks.push(e.data); };
+    mediaRec.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());     // libère le micro
+      fichierVoix = new Blob(mediaChunks, { type: mediaRec.mimeType || "audio/webm" });
+      voixDataUrl = URL.createObjectURL(fichierVoix);
+      const sec = Math.min(DUREE_VOIX_MAX, Math.round((Date.now() - recDebut) / 1000));
+      voixBtn.classList.remove("rec");
+      voixBtn.textContent = "🎙️";
+      voixInfo.innerHTML = `<b>Vocal enregistré</b> · ${sec}s · écoutable 3 fois`;
+      voixSuppr.style.display = "block";
+    };
+    mediaRec.start();
+    recDebut = Date.now();
+    voixBtn.classList.add("rec");
+    voixBtn.textContent = "⏹️";
+    let reste = DUREE_VOIX_MAX;
+    voixInfo.innerHTML = `<b>Enregistrement…</b> ${reste}s restantes`;
+    recTimer = setInterval(() => {
+      reste--;
+      voixInfo.innerHTML = `<b>Enregistrement…</b> ${reste}s restantes`;
+      if (reste <= 0) arreterVoix();   // coupe à 1 min pile
+    }, 1000);
+  } catch {
+    toast("Autorise le micro pour enregistrer", true);
+  }
+};
+
+function arreterVoix() {
+  clearInterval(recTimer);
+  if (mediaRec && mediaRec.state === "recording") mediaRec.stop();
+}
+
+voixSuppr.onclick = () => {
+  fichierVoix = null; voixDataUrl = null;
+  voixBtn.textContent = "🎙️"; voixBtn.classList.remove("rec");
+  voixInfo.innerHTML = "Commentaire vocal (optionnel) — 1 min max, écoutable 3 fois";
+  voixSuppr.style.display = "none";
+};
+
 function verifEnvoi() {
   document.getElementById("envoyer").disabled = !(choixType && choixPos);
 }
@@ -1290,7 +1366,7 @@ document.getElementById("envoyer").onclick = async () => {
         id: "local" + Date.now(), type: choixType, niveau: choixNiveau,
         position: { latitude: choixPos.lat, longitude: choixPos.lng },
         commentaire: document.getElementById("commentaire").value.trim(),
-        photoUrl: photoDataUrl, verifiePar: null,
+        photoUrl: photoDataUrl, voixUrl: voixDataUrl, verifiePar: null,
         auteurPseudo: profil?.pseudo || "Citoyen",
         creePar: utilisateur.uid,
         creeLe: Date.now(), expireLe: Date.now() + DUREE_VIE_MS,
@@ -1325,11 +1401,17 @@ document.getElementById("envoyer").onclick = async () => {
         await fb.uploadBytes(ref, fichierPhoto, { contentType: "image/jpeg" });
         photoUrl = await fb.getDownloadURL(ref);
       }
+      let voixUrl = null;
+      if (fichierVoix) {
+        const refV = fb.ref(fb.storage, `vocaux/${utilisateur.uid}_${Date.now()}.webm`);
+        await fb.uploadBytes(refV, fichierVoix, { contentType: fichierVoix.type || "audio/webm" });
+        voixUrl = await fb.getDownloadURL(refV);
+      }
       await fb.addDoc(fb.collection(fb.db, "signalements"), {
         type: choixType, niveau: choixNiveau,
         position: new fb.GeoPoint(choixPos.lat, choixPos.lng),
         commentaire: document.getElementById("commentaire").value.trim(),
-        photoUrl, creePar: utilisateur.uid,
+        photoUrl, voixUrl, creePar: utilisateur.uid,
         auteurPseudo: profil?.pseudo || "Citoyen",
         creeLe: fb.serverTimestamp(),
         expireLe: fb.Timestamp.fromMillis(Date.now() + DUREE_VIE_MS),

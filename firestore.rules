@@ -31,7 +31,9 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['statut','verifiePar']);
 
-      allow delete: if estForceOrdre();
+      // Suppression : par les forces de l'ordre, OU par l'auteur de son propre signalement
+      allow delete: if estForceOrdre()
+        || (connecte() && resource.data.creePar == request.auth.uid);
 
       // Votes : 1 document par utilisateur (empêche le double vote)
       match /votes/{uid} {
