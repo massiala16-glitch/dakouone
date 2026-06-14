@@ -90,6 +90,19 @@
   }
   .mode-demo.on{display:block}
 
+  /* ----- Invite d'activation de la localisation ----- */
+  .geo-invite{
+    position:absolute;bottom:88px;left:50%;transform:translateX(-50%);z-index:1100;
+    display:none;align-items:center;gap:10px;
+    background:var(--lagon);color:#fff;border:none;border-radius:999px;
+    padding:12px 20px;font-family:inherit;font-size:.85rem;font-weight:700;cursor:pointer;
+    box-shadow:0 6px 20px rgba(14,155,181,.4);
+    animation:geoPulse 2s ease-in-out infinite;
+  }
+  .geo-invite.on{display:flex}
+  .geo-invite svg{flex:none}
+  @keyframes geoPulse{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.04)}}
+
   .fab{
     position:absolute;bottom:24px;left:50%;transform:translateX(-50%);z-index:1000;
     background:var(--vigilance);color:#1a1206;border:none;cursor:pointer;border-radius:999px;
@@ -508,6 +521,11 @@
 
 <button class="confid-btn" id="confidBtn" title="Signalement confidentiel (autorités)">🔒</button>
 
+<button class="geo-invite" id="geoInvite">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+  Activer ma localisation
+</button>
+
 <!-- Modal auth téléphone -->
 <div class="voile" id="voileAuth">
   <div class="feuille">
@@ -880,6 +898,62 @@ function activerSecours() {
 }
 tuiles.on("tileerror", activerSecours);
 setTimeout(() => { if (!document.querySelector(".leaflet-tile-loaded")) activerSecours(); }, 4000);
+
+/* ============================================================
+   ACTIVATION DE LA LOCALISATION (invite + suivi position)
+   ============================================================ */
+let maPosition = null;          // dernière position connue de l'utilisateur
+let marqueurMaPos = null;
+
+function afficherMaPosition(lat, lng) {
+  maPosition = { lat, lng };
+  if (marqueurMaPos) map.removeLayer(marqueurMaPos);
+  // Point bleu "ma position" façon GPS
+  marqueurMaPos = L.circleMarker([lat, lng], {
+    radius: 7, color: "#fff", weight: 2, fillColor: "#2f5fd0", fillOpacity: 1
+  }).addTo(map);
+  document.getElementById("geoInvite").classList.remove("on");
+}
+
+function demanderLocalisation(centrer = true) {
+  if (!navigator.geolocation) { toast("GPS non disponible sur cet appareil", true); return; }
+  navigator.geolocation.getCurrentPosition(
+    (p) => {
+      afficherMaPosition(p.coords.latitude, p.coords.longitude);
+      if (centrer) map.setView([p.coords.latitude, p.coords.longitude], 14);
+      toast("Localisation activée ✓");
+      // Suit la position en continu (léger) pour garder le point à jour
+      navigator.geolocation.watchPosition(
+        (q) => afficherMaPosition(q.coords.latitude, q.coords.longitude),
+        () => {}, { enableHighAccuracy: true, maximumAge: 30000 }
+      );
+    },
+    (err) => {
+      console.warn("Géoloc:", err);
+      const msg = err.code === 1
+        ? "Localisation refusée — autorise-la dans les réglages"
+        : "Position indisponible, réessaie";
+      toast(msg, true);
+      document.getElementById("geoInvite").classList.add("on");
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+document.getElementById("geoInvite").onclick = () => demanderLocalisation(true);
+
+/* Au démarrage : montre l'invite, ou demande directement si déjà autorisé */
+window.addEventListener("load", () => {
+  if (!navigator.geolocation) return;
+  if (navigator.permissions?.query) {
+    navigator.permissions.query({ name: "geolocation" }).then((st) => {
+      if (st.state === "granted") demanderLocalisation(true);   // déjà autorisé → direct
+      else document.getElementById("geoInvite").classList.add("on"); // sinon → invite
+    }).catch(() => document.getElementById("geoInvite").classList.add("on"));
+  } else {
+    document.getElementById("geoInvite").classList.add("on");
+  }
+});
 
 /* ============================================================
    AUTH TÉLÉPHONE — réel (Firebase) ou simulé (démo)
@@ -1679,6 +1753,7 @@ document.getElementById("maPos").onclick = () => {
   navigator.geolocation.getCurrentPosition((p) => {
     const ll = L.latLng(p.coords.latitude, p.coords.longitude);
     map.setView(ll, 14);
+    afficherMaPosition(p.coords.latitude, p.coords.longitude);  // point bleu + masque l'invite
     choixPos = ll;
     if (marqueurTemp) map.removeLayer(marqueurTemp);
     marqueurTemp = L.circleMarker(ll, { radius: 9, color: "#0e9bb5", weight: 2, fillOpacity: .3 }).addTo(map);
