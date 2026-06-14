@@ -41,6 +41,13 @@ service cloud.firestore {
         allow create: if connecte() && uid == request.auth.uid;
         allow update, delete: if false;
       }
+
+      // Signalements d'abus : 1 document par utilisateur (anti double-signalement)
+      match /abus/{uid} {
+        allow read: if estForceOrdre();
+        allow create: if connecte() && uid == request.auth.uid;
+        allow update, delete: if false;
+      }
     }
 
     // ---- Signalements confidentiels (citoyens vérifiés → forces de l'ordre uniquement) ----

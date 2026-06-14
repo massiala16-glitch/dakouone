@@ -172,6 +172,11 @@
     width:100%;margin-top:7px;background:rgba(255,83,64,.12);color:var(--alerte);
     border:none;border-radius:9px;padding:8px 4px;cursor:pointer;font-size:.74rem;font-weight:700;font-family:inherit;
   }
+  .b-abus{
+    width:100%;margin-top:7px;background:transparent;color:var(--muted);
+    border:none;border-radius:9px;padding:6px 4px;cursor:pointer;font-size:.7rem;font-weight:600;font-family:inherit;
+  }
+  .b-abus:hover{color:var(--alerte)}
   .badge-verif{
     display:inline-flex;align-items:center;gap:6px;background:rgba(29,78,216,.18);
     border:1px solid var(--officiel);color:#2f5fd0;border-radius:999px;
@@ -1155,6 +1160,7 @@ function sauverEcoutes() {
   try { localStorage.setItem("dak_ecoutes", JSON.stringify(ecoutesVocal)); } catch {}
 }
 let audioEnCours = null;
+let abusLocaux = {};   // compteur d'abus local par signalement (masquage immédiat à 3)
 
 /* ----- Filtres par type ----- */
 const typesActifs = new Set(["rassemblement", "caillassage", "barrage"]);
@@ -1312,6 +1318,9 @@ function popupPour(s) {
   const estMien = utilisateur && s.creePar === utilisateur.uid;
   const btnSuppr = estMien
     ? `<button class="b-suppr" data-suppr="${s.id}">🗑️ Supprimer mon signalement</button>` : "";
+  // Signaler un abus : pas sur ses propres signalements ni sur ceux vérifiés par la gendarmerie
+  const btnAbus = (!estMien && !s.verifiePar)
+    ? `<button class="b-abus" data-abus="${s.id}">⚐ Signaler un abus</button>` : "";
   const ecoutes = ecoutesVocal[s.id] || 0;
   const restantes = Math.max(0, 3 - ecoutes);
   const blocVoix = s.voixUrl
@@ -1331,11 +1340,14 @@ function popupPour(s) {
       <button class="b-encore" data-vote="confirme" data-id="${s.id}">Toujours là</button>
       <button class="b-fini" data-vote="infirme" data-id="${s.id}">C'est terminé</button>
     </div>
-    ${btnSuppr}`;
+    ${btnSuppr}
+    ${btnAbus}`;
 }
 
 function ajouterMarqueur(s) {
   if (marqueurs[s.id]) return;
+  // Masqué par modération (compté côté serveur) → on ne l'affiche pas
+  if (s.statut === "masque" || (s.nbAbus || 0) >= 3) return;
   const m = L.marker([s.position.latitude, s.position.longitude], { icon: iconePour(s) }).addTo(map);
   m._dak = s;
   m.bindPopup(() => popupPour(m._dak));
@@ -1441,6 +1453,45 @@ document.addEventListener("click", async (e) => {
   }
 });
 
+/* Signaler un abus sur un signalement (1 par appareil).
+   Masquage local automatique à 3 abus. Côté serveur : Cloud Function (Blaze). */
+let abusFaits = {};
+try { abusFaits = JSON.parse(localStorage.getItem("dak_abus") || "{}"); } catch {}
+
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-abus]");
+  if (!b) return;
+  if (!utilisateur) { ouvrirAuth(); return; }
+  const id = b.dataset.abus;
+  const s = marqueurs[id]?._dak;
+  if (!s) return;
+  if (s.creePar === utilisateur.uid) { toast("Tu ne peux pas signaler ton propre signalement", true); return; }
+  if (abusFaits[id]) { toast("Tu as déjà signalé ce contenu", true); return; }
+
+  if (!confirm("Signaler ce contenu comme abusif (faux, injurieux, choquant) ?")) return;
+
+  // Marque localement (anti double-signalement par appareil)
+  abusFaits[id] = true;
+  try { localStorage.setItem("dak_abus", JSON.stringify(abusFaits)); } catch {}
+
+  // Compteur d'abus local pour le masquage immédiat côté affichage
+  abusLocaux[id] = (abusLocaux[id] || 0) + 1;
+
+  if (!MODE_DEMO) {
+    try {
+      // 1 doc par uid → empêche le double signalement côté serveur aussi
+      await fb.setDoc(fb.doc(fb.db, "signalements", id, "abus", utilisateur.uid),
+        { date: fb.serverTimestamp(), par: utilisateur.uid });
+    } catch (err) { console.error(err); }
+  }
+
+  map.closePopup();
+  toast("Merci, le contenu a été signalé pour modération");
+
+  // Masquage local automatique dès 3 abus (en attendant la modération serveur)
+  if (abusLocaux[id] >= 3) { retirerMarqueur(id); majCompteur(); }
+});
+
 /* Lecture d'un commentaire vocal — max 3 écoutes par appareil */
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-voix]");
@@ -1498,6 +1549,30 @@ function mediasRestants() {
 function enregistrerPublicationMedia() {
   publicationsMedia.push(Date.now());
   try { localStorage.setItem("dak_pub_media", JSON.stringify(publicationsMedia)); } catch {}
+}
+
+/* Rate-limiting client : min 20s entre 2 signalements, max 15 par heure glissante */
+const DELAI_MIN_MS = 20000;
+const MAX_PAR_HEURE = 15;
+let publicationsToutes = [];
+try { publicationsToutes = JSON.parse(localStorage.getItem("dak_pub_all") || "[]"); } catch {}
+
+function verifierCadence() {
+  const now = Date.now();
+  publicationsToutes = publicationsToutes.filter(t => now - t < 3600000); // garde la dernière heure
+  const derniere = publicationsToutes[publicationsToutes.length - 1];
+  if (derniere && now - derniere < DELAI_MIN_MS) {
+    const s = Math.ceil((DELAI_MIN_MS - (now - derniere)) / 1000);
+    return { ok: false, msg: `Patiente ${s}s avant un nouveau signalement` };
+  }
+  if (publicationsToutes.length >= MAX_PAR_HEURE) {
+    return { ok: false, msg: "Trop de signalements cette heure-ci, réessaie plus tard" };
+  }
+  return { ok: true };
+}
+function enregistrerCadence() {
+  publicationsToutes.push(Date.now());
+  try { localStorage.setItem("dak_pub_all", JSON.stringify(publicationsToutes)); } catch {}
 }
 let marqueurTemp = null;
 
@@ -1670,6 +1745,10 @@ document.getElementById("envoyer").onclick = async () => {
   if (!choixType || !choixPos || !utilisateur) return;
   const btn = document.getElementById("envoyer");
 
+  /* 🛡️ Rate-limiting client (dissuasif ; le vrai blocage est la Cloud Function) */
+  const rl = verifierCadence();
+  if (!rl.ok) { toast(rl.msg, true); return; }
+
   /* 🔒 Limite : 10 publications avec photo/vocal par tranche de 3h */
   const avecMedia = !!(fichierPhoto || fichierVoix);
   if (avecMedia && mediasRestants() <= 0) {
@@ -1745,6 +1824,7 @@ document.getElementById("envoyer").onclick = async () => {
          passe en "confirme" (5 validations) ou "verifie" (forces de l'ordre) */
     }
     if (avecMedia) enregistrerPublicationMedia();
+    enregistrerCadence();
     fermerModal();
     toast("Alerte publiée sur DAKOUONE 🌴");
   } catch (e) {
