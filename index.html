@@ -415,6 +415,13 @@
     background:var(--vigilance);color:#1a1206;border:none;border-radius:999px;
     padding:14px 40px;font-size:1rem;font-weight:800;cursor:pointer;font-family:inherit;
   }
+  .ob-nav{display:flex;gap:10px;align-items:center;justify-content:center}
+  .ob-prec{
+    background:var(--panel2);color:var(--muted);border:none;border-radius:999px;
+    padding:14px 24px;font-size:1rem;font-weight:700;cursor:pointer;font-family:inherit;
+    visibility:hidden;
+  }
+  .ob-prec.on{visibility:visible}
   .ob-skip{background:none;border:none;color:var(--muted);font-size:.82rem;cursor:pointer;margin-top:16px;font-family:inherit}
 </style>
 </head>
@@ -430,13 +437,13 @@
   <div class="ob-slide on" data-s="0">
     <div class="ob-emoji">🗺️</div>
     <div class="ob-titre">La carte de vigilance de Mayotte</div>
-    <div class="ob-txt">Vois en temps réel les <b>rassemblements anormaux</b>, caillassages et routes bloquées signalés près de toi.</div>
+    <div class="ob-txt" style="color:var(--alerte)">Vois en temps réel les rassemblements anormaux, caillassages et routes bloquées signalés près de toi.</div>
   </div>
 
   <div class="ob-slide" data-s="1">
     <div class="ob-emoji">📍</div>
-    <div class="ob-titre">Signale et valide sur place</div>
-    <div class="ob-txt">Tu signales un danger là où tu es. Quand <b>5 personnes</b> qui passent confirment, l'alerte est validée. Chaque alerte expire au bout de 2 h.</div>
+    <div class="ob-titre">Signale et valide à proximité</div>
+    <div class="ob-txt">Tu signales un danger à proximité <b>(1 km)</b>. Les autres confirment — au bout de <b>5 personnes</b>, l'alerte est validée. Chaque alerte expire au bout de <b>3 h</b>.</div>
   </div>
 
   <div class="ob-slide" data-s="2">
@@ -445,10 +452,19 @@
     <div class="ob-txt"><span class="ob-urgence">DAKOUONE ne remplace jamais les secours.</span><br>En danger immédiat, appelle le <b>17</b> et ne t'approche jamais d'un danger pour le signaler.</div>
   </div>
 
-  <div class="ob-points">
-    <div class="ob-point on"></div><div class="ob-point"></div><div class="ob-point"></div>
+  <div class="ob-slide" data-s="3">
+    <div class="ob-emoji">🌴</div>
+    <div class="ob-titre" style="color:var(--vigilance)">NARI SAYIDIYANé</div>
+    <div class="ob-txt"><b style="font-size:1.05rem">À plusieurs, nous sommes plus forts.</b><br><br>Ensemble, gardons un œil sur Maore. Bienvenue dans DAKOUONE.</div>
   </div>
-  <button class="ob-btn" id="obSuivant">Suivant</button>
+
+  <div class="ob-points">
+    <div class="ob-point on"></div><div class="ob-point"></div><div class="ob-point"></div><div class="ob-point"></div>
+  </div>
+  <div class="ob-nav">
+    <button class="ob-prec" id="obPrec">Précédent</button>
+    <button class="ob-btn" id="obSuivant">Suivant</button>
+  </div>
   <button class="ob-skip" id="obSkip">Passer</button>
 </div>
 
@@ -679,17 +695,20 @@ const MODE_DEMO = firebaseConfig.apiKey.includes("TA_CLE");
   const slides = ob.querySelectorAll(".ob-slide");
   const points = ob.querySelectorAll(".ob-point");
   const btn = document.getElementById("obSuivant");
+  const btnPrec = document.getElementById("obPrec");
 
   function montrer(n) {
     slides.forEach((s, k) => s.classList.toggle("on", k === n));
     points.forEach((p, k) => p.classList.toggle("on", k === n));
     btn.textContent = n === slides.length - 1 ? "Commencer 🌴" : "Suivant";
+    btnPrec.classList.toggle("on", n > 0);   // visible sauf sur la 1re slide
   }
   function fermer() {
     try { localStorage.setItem("dak_onboard", "1"); } catch {}
     ob.classList.add("cache");
   }
   btn.onclick = () => { i < slides.length - 1 ? montrer(++i) : fermer(); };
+  btnPrec.onclick = () => { if (i > 0) montrer(--i); };
   document.getElementById("obSkip").onclick = fermer;
 })();
 
