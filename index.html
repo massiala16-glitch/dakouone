@@ -1083,14 +1083,20 @@ btnSms.onclick = async () => {
         majProfil();
       } else {
         const cred = await confirmation.confirm(code);
-        await fb.setDoc(fb.doc(fb.db, "utilisateurs", cred.user.uid), {
-          role: "citoyen", telephoneVerifie: true,
-          pseudo: pseudoParDefaut(),
-          prenom: info.prenom || "", nom: info.nomFamille || "", naissance: info.naissance || "",
-          points: 0, identiteVerifiee: false,
-          premium: false, notifActives: true,
-          fiabilite: 0, banni: false, creeLe: fb.serverTimestamp()
-        }, { merge: true });
+        // Crée le profil UNIQUEMENT à la première inscription.
+        // À la reconnexion d'un compte existant, on ne réécrit rien (sinon refus de permission).
+        const refProfil = fb.doc(fb.db, "utilisateurs", cred.user.uid);
+        const dejaLa = await fb.getDoc(refProfil);
+        if (!dejaLa.exists()) {
+          await fb.setDoc(refProfil, {
+            role: "citoyen", telephoneVerifie: true,
+            pseudo: pseudoParDefaut(),
+            prenom: info.prenom || "", nom: info.nomFamille || "", naissance: info.naissance || "",
+            points: 0, identiteVerifiee: false,
+            premium: false, notifActives: true,
+            fiabilite: 0, banni: false, creeLe: fb.serverTimestamp()
+          });
+        }
       }
       voileAuth.classList.remove("on");
       confirmation = null;
