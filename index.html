@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>DAKOUONE — Vigilance Mayotte</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#f59f0a">
@@ -681,6 +681,34 @@ const firebaseConfig = {
 };
 
 const MODE_DEMO = firebaseConfig.apiKey.includes("TA_CLE");
+
+/* ============================================================
+   Empêcher le zoom du NAVIGATEUR sur iOS (pinch + double-tap),
+   sauf à l'intérieur de la carte Leaflet qui gère son propre zoom.
+   ============================================================ */
+(function bloquerZoomNavigateur() {
+  // Bloque le pincement multi-touch hors de la carte
+  document.addEventListener("touchmove", (e) => {
+    if (e.touches.length > 1 && !e.target.closest("#map")) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  // Bloque le double-tap-zoom de Safari hors de la carte
+  let dernierTap = 0;
+  document.addEventListener("touchend", (e) => {
+    const maintenant = Date.now();
+    if (maintenant - dernierTap < 300 && !e.target.closest("#map")) {
+      e.preventDefault();
+    }
+    dernierTap = maintenant;
+  }, { passive: false });
+
+  // Bloque le zoom par geste (Safari spécifique)
+  document.addEventListener("gesturestart", (e) => {
+    if (!e.target.closest("#map")) e.preventDefault();
+  });
+})();
 
 /* ============================================================
    ÉCRAN D'ACCUEIL (première visite uniquement)
