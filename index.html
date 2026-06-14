@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>DAKOUONE — Vigilance Mayotte</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#f59f0a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="DAKOUONE">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
@@ -50,6 +56,20 @@
     padding:5px 14px;font-size:.72rem;color:var(--muted);white-space:nowrap;
   }
   .urgence b{color:var(--alerte)}
+
+  /* ----- Barre de filtres par type ----- */
+  .filtres{
+    position:absolute;top:92px;left:50%;transform:translateX(-50%);z-index:999;
+    display:flex;gap:6px;padding:5px;background:rgba(255,255,255,.92);
+    border:1px solid #d9e2ea;border-radius:999px;box-shadow:0 3px 12px rgba(30,50,70,.12);
+    backdrop-filter:blur(4px);
+  }
+  .filtre{
+    width:38px;height:38px;border-radius:50%;border:1.5px solid transparent;
+    background:var(--panel2);cursor:pointer;font-size:1.05rem;
+    display:flex;align-items:center;justify-content:center;transition:.15s;opacity:.45;
+  }
+  .filtre.actif{opacity:1;border-color:var(--vigilance);background:rgba(245,159,10,.12)}
   .mode-demo{
     position:absolute;top:92px;left:50%;transform:translateX(-50%);z-index:1000;
     background:rgba(255,176,32,.12);border:1px solid var(--vigilance);border-radius:999px;
@@ -329,11 +349,68 @@
   .leaflet-control-attribution a{color:#5a6675!important}
   .leaflet-control-zoom{display:none}
   @media (prefers-reduced-motion: reduce){.halo,.dot{animation:none}}
+
+  /* ----- Écran d'accueil (onboarding) ----- */
+  .onboard{
+    position:absolute;inset:0;z-index:5000;background:var(--night);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:32px 26px;text-align:center;
+  }
+  .onboard.cache{display:none}
+  .ob-logo{font-size:1.7rem;font-weight:800;letter-spacing:.04em;margin-bottom:6px}
+  .ob-logo span{color:var(--vigilance)}
+  .ob-sous{font-size:.7rem;color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-bottom:38px}
+  .ob-slide{max-width:340px;display:none;animation:obFade .35s ease}
+  .ob-slide.on{display:block}
+  @keyframes obFade{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+  .ob-emoji{font-size:3.4rem;margin-bottom:18px}
+  .ob-titre{font-size:1.35rem;font-weight:800;margin-bottom:12px}
+  .ob-txt{font-size:.95rem;color:var(--muted);line-height:1.5}
+  .ob-txt b{color:var(--ink)}
+  .ob-urgence{color:var(--alerte);font-weight:700}
+  .ob-points{display:flex;gap:8px;justify-content:center;margin:30px 0 24px}
+  .ob-point{width:8px;height:8px;border-radius:50%;background:#2a3442;transition:.2s}
+  .ob-point.on{background:var(--vigilance);width:22px;border-radius:4px}
+  .ob-btn{
+    background:var(--vigilance);color:#1a1206;border:none;border-radius:999px;
+    padding:14px 40px;font-size:1rem;font-weight:800;cursor:pointer;font-family:inherit;
+  }
+  .ob-skip{background:none;border:none;color:var(--muted);font-size:.82rem;cursor:pointer;margin-top:16px;font-family:inherit}
 </style>
 </head>
 <body>
 
 <div id="map"></div>
+
+<!-- Écran d'accueil (premier lancement) -->
+<div class="onboard" id="onboard">
+  <div class="ob-logo">DAKOU<span>ONE</span></div>
+  <div class="ob-sous">Vigilance · Maore</div>
+
+  <div class="ob-slide on" data-s="0">
+    <div class="ob-emoji">🗺️</div>
+    <div class="ob-titre">La carte de vigilance de Mayotte</div>
+    <div class="ob-txt">Vois en temps réel les <b>coupeurs de route</b>, rassemblements, caillassages et barrages signalés près de toi.</div>
+  </div>
+
+  <div class="ob-slide" data-s="1">
+    <div class="ob-emoji">📍</div>
+    <div class="ob-titre">Signale et valide sur place</div>
+    <div class="ob-txt">Tu signales un danger là où tu es. Quand <b>5 personnes</b> qui passent confirment, l'alerte est validée. Chaque alerte expire au bout de 2 h.</div>
+  </div>
+
+  <div class="ob-slide" data-s="2">
+    <div class="ob-emoji">🚨</div>
+    <div class="ob-titre">En cas d'urgence</div>
+    <div class="ob-txt"><span class="ob-urgence">DAKOUONE ne remplace jamais les secours.</span><br>En danger immédiat, appelle le <b>17</b> et ne t'approche jamais d'un danger pour le signaler.</div>
+  </div>
+
+  <div class="ob-points">
+    <div class="ob-point on"></div><div class="ob-point"></div><div class="ob-point"></div>
+  </div>
+  <button class="ob-btn" id="obSuivant">Suivant</button>
+  <button class="ob-skip" id="obSkip">Passer</button>
+</div>
 
 <header>
   <div class="logo">
@@ -346,6 +423,14 @@
 </header>
 
 <div class="urgence">En danger immédiat&nbsp;? Appelez le <b>17</b> — ne vous approchez jamais.</div>
+
+<div class="filtres" id="filtres">
+  <button class="filtre actif" data-f="tous" title="Tous">🌴</button>
+  <button class="filtre actif" data-f="coupeurs" title="Coupeurs de route">🛑</button>
+  <button class="filtre actif" data-f="rassemblement" title="Rassemblement">👥</button>
+  <button class="filtre actif" data-f="caillassage" title="Caillassage">⚠️</button>
+  <button class="filtre actif" data-f="barrage" title="Route bloquée">🚧</button>
+</div>
 <div class="mode-demo" id="modeDemoBadge">Mode démo local — Firebase non configuré (code SMS : 123456)</div>
 
 <div class="notif-banner" id="notifBanner">
@@ -502,6 +587,33 @@ const firebaseConfig = {
 };
 
 const MODE_DEMO = firebaseConfig.apiKey.includes("TA_CLE");
+
+/* ============================================================
+   ÉCRAN D'ACCUEIL (première visite uniquement)
+   ============================================================ */
+(function onboarding() {
+  let vu = false;
+  try { vu = localStorage.getItem("dak_onboard") === "1"; } catch {}
+  const ob = document.getElementById("onboard");
+  if (vu) { ob.classList.add("cache"); return; }
+
+  let i = 0;
+  const slides = ob.querySelectorAll(".ob-slide");
+  const points = ob.querySelectorAll(".ob-point");
+  const btn = document.getElementById("obSuivant");
+
+  function montrer(n) {
+    slides.forEach((s, k) => s.classList.toggle("on", k === n));
+    points.forEach((p, k) => p.classList.toggle("on", k === n));
+    btn.textContent = n === slides.length - 1 ? "Commencer 🌴" : "Suivant";
+  }
+  function fermer() {
+    try { localStorage.setItem("dak_onboard", "1"); } catch {}
+    ob.classList.add("cache");
+  }
+  btn.onclick = () => { i < slides.length - 1 ? montrer(++i) : fermer(); };
+  document.getElementById("obSkip").onclick = fermer;
+})();
 const DUREE_VIE_MS = 2 * 60 * 60 * 1000;
 const RAYON_PROXIMITE_M = 500;     // il faut être à moins de 500 m pour signaler/valider
 const SEUIL_CONFIRMATION = 5;      // 5 validations citoyennes → signalement confirmé
@@ -914,6 +1026,36 @@ function sauverEcoutes() {
 }
 let audioEnCours = null;
 
+/* ----- Filtres par type ----- */
+const typesActifs = new Set(["coupeurs", "rassemblement", "caillassage", "barrage"]);
+
+function appliquerFiltres() {
+  Object.values(marqueurs).forEach(m => {
+    const visible = typesActifs.has(m._dak.type);
+    const el = m.getElement();
+    if (el) el.style.display = visible ? "" : "none";
+  });
+}
+
+document.getElementById("filtres").addEventListener("click", (e) => {
+  const b = e.target.closest(".filtre");
+  if (!b) return;
+  const f = b.dataset.f;
+
+  if (f === "tous") {
+    // Bouton "tous" : réactive tout
+    ["coupeurs", "rassemblement", "caillassage", "barrage"].forEach(t => typesActifs.add(t));
+    document.querySelectorAll(".filtre").forEach(x => x.classList.add("actif"));
+  } else {
+    if (typesActifs.has(f)) typesActifs.delete(f); else typesActifs.add(f);
+    b.classList.toggle("actif", typesActifs.has(f));
+    // Le bouton "tous" reste actif seulement si les 4 types sont visibles
+    document.querySelector('[data-f="tous"]')
+      .classList.toggle("actif", typesActifs.size === 4);
+  }
+  appliquerFiltres();
+});
+
 function estExpire(s) {
   const exp = s.expireLe?.toMillis ? s.expireLe.toMillis() : s.expireLe;
   return exp && exp < Date.now();
@@ -1070,6 +1212,11 @@ function ajouterMarqueur(s) {
   m._dak = s;
   m.bindPopup(() => popupPour(m._dak));
   marqueurs[s.id] = m;
+  // Respecte les filtres en cours
+  if (!typesActifs.has(s.type)) {
+    const el = m.getElement();
+    if (el) el.style.display = "none";
+  }
 }
 
 function retirerMarqueur(id) {
@@ -1480,6 +1627,15 @@ function toast(msg, erreur = false) {
   t.classList.add("on");
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove("on"), 2800);
+}
+
+/* ============================================================
+   PWA — enregistrement du service worker
+   ============================================================ */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch((e) => console.warn("SW:", e));
+  });
 }
 </script>
 </body>

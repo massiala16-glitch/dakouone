@@ -1,0 +1,26 @@
+{
+  "name": "DAKOUONE — Vigilance Mayotte",
+  "short_name": "DAKOUONE",
+  "description": "La carte de vigilance citoyenne de Mayotte : signalements en temps réel.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f8fb",
+  "theme_color": "#f59f0a",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
