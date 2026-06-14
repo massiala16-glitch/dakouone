@@ -19,7 +19,7 @@ service cloud.firestore {
       allow read: if true;  // carte publique, consultable par tous
 
       allow create: if connecte() && nonBanni()
-        && request.resource.data.type in ['coupeurs','rassemblement','caillassage','barrage']
+        && request.resource.data.type in ['rassemblement','caillassage','barrage']
         && request.resource.data.niveau in [1,2,3]
         && request.resource.data.commentaire.size() <= 180
         && request.resource.data.creePar == request.auth.uid

@@ -20,6 +20,19 @@
     --officiel:#1d4ed8; --radius:14px; font-size:16px;
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+
+  /* ----- Thème nuit ----- */
+  body.nuit{
+    --night:#0d1117; --panel:#161d27; --panel2:#1e2733;
+    --ink:#e8edf3; --muted:#8b98a8;
+  }
+  body.nuit .filtres{background:rgba(22,29,39,.92);border-color:#2a3442}
+  body.nuit .filtre{background:#1e2733}
+  body.nuit .urgence{background:rgba(22,29,39,.92);border-color:#2a3442}
+  body.nuit .compteur,body.nuit .points-pill,body.nuit .profil{border-color:#2a3442}
+  body.nuit .leaflet-popup-content-wrapper,body.nuit .leaflet-popup-tip{border-color:#2a3442}
+  body.nuit .notif-banner{box-shadow:0 8px 26px rgba(0,0,0,.5)}
+  body.nuit #map{background:#0a0e13}
   html,body{height:100%;overflow:hidden}
   body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--night);color:var(--ink)}
   #map{position:absolute;inset:0;z-index:1;background:#cfe6f0}
@@ -232,6 +245,8 @@
   .envoyer:disabled{opacity:.35;cursor:not-allowed}
 
   .tel-ligne{display:flex;gap:8px;margin-bottom:14px}
+  .id-ligne{display:flex;gap:8px}
+  .id-ligne .champ{flex:1}
 
   /* ----- Profil & points ----- */
   .points-pill{
@@ -241,6 +256,12 @@
   }
   .points-pill.on{display:flex}
   .profil-tete{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .theme-btn{
+    width:42px;height:42px;border-radius:50%;border:1.5px solid #d9e2ea;flex:none;
+    background:var(--panel2);cursor:pointer;font-size:1.15rem;
+    display:flex;align-items:center;justify-content:center;transition:transform .12s;
+  }
+  .theme-btn:active{transform:scale(.9)}
   .profil-avatar{
     width:56px;height:56px;border-radius:50%;background:var(--panel2);
     border:2px solid var(--lagon);display:flex;align-items:center;justify-content:center;font-size:26px;
@@ -390,7 +411,7 @@
   <div class="ob-slide on" data-s="0">
     <div class="ob-emoji">🗺️</div>
     <div class="ob-titre">La carte de vigilance de Mayotte</div>
-    <div class="ob-txt">Vois en temps réel les <b>coupeurs de route</b>, rassemblements, caillassages et barrages signalés près de toi.</div>
+    <div class="ob-txt">Vois en temps réel les <b>rassemblements anormaux</b>, caillassages et routes bloquées signalés près de toi.</div>
   </div>
 
   <div class="ob-slide" data-s="1">
@@ -426,7 +447,6 @@
 
 <div class="filtres" id="filtres">
   <button class="filtre actif" data-f="tous" title="Tous">🌴</button>
-  <button class="filtre actif" data-f="coupeurs" title="Coupeurs de route">🛑</button>
   <button class="filtre actif" data-f="rassemblement" title="Rassemblement">👥</button>
   <button class="filtre actif" data-f="caillassage" title="Caillassage">⚠️</button>
   <button class="filtre actif" data-f="barrage" title="Route bloquée">🚧</button>
@@ -456,6 +476,14 @@
   <div class="feuille">
     <h2>Vérifie ton numéro</h2>
     <p class="sous">Obligatoire pour publier un signalement. La carte reste consultable sans compte.</p>
+
+    <div class="label">Identité</div>
+    <div class="id-ligne">
+      <input class="champ" id="prenomInput" type="text" placeholder="Prénom" autocomplete="given-name">
+      <input class="champ" id="nomFamilleInput" type="text" placeholder="Nom" autocomplete="family-name">
+    </div>
+    <input class="champ" id="naissanceInput" type="date" autocomplete="bday" aria-label="Date de naissance">
+
     <div class="label">Numéro de téléphone</div>
     <div class="tel-ligne">
       <select class="indicatif" id="indicatif">
@@ -475,7 +503,7 @@
       <div class="label">Code reçu par SMS</div>
       <input class="champ" id="codeInput" type="text" placeholder="123456" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
     </div>
-    <p class="auth-info">Ton numéro n'est jamais affiché publiquement. Il sert uniquement à responsabiliser les signalements.</p>
+    <p class="auth-info">Ton numéro et ta date de naissance ne sont jamais affichés publiquement. Ils servent uniquement à responsabiliser les signalements.</p>
     <div class="actions">
       <button class="annuler" id="authAnnuler">Plus tard</button>
       <button class="envoyer" id="btn-sms">Recevoir le code</button>
@@ -490,7 +518,6 @@
     <p class="sous">Touche la carte derrière pour placer le point, ou utilise ta position GPS. Astuce : maintiens le bouton Signaler pour publier vite sur place.</p>
     <div class="label">Type d'incident</div>
     <div class="grille-types" id="types">
-      <button class="type-btn" data-t="coupeurs"><span class="ico">🛑</span>Coupeurs de route</button>
       <button class="type-btn" data-t="rassemblement"><span class="ico">👥</span>Rassemblement anormal</button>
       <button class="type-btn" data-t="caillassage"><span class="ico">⚠️</span>Caillassage</button>
       <button class="type-btn" data-t="barrage"><span class="ico">🚧</span>Route bloquée</button>
@@ -526,11 +553,12 @@
   <div class="feuille">
     <div class="profil-tete">
       <div class="profil-avatar">👤</div>
-      <div>
+      <div style="flex:1">
         <div class="profil-nom" id="profilNom">—</div>
         <div class="profil-points">🪨 <span id="profilPoints">0</span> point(s)</div>
         <div class="statut-id non" id="statutId">Identité non vérifiée</div>
       </div>
+      <button class="theme-btn" id="themeBtn" title="Mode jour / nuit">🌙</button>
     </div>
 
     <div class="label">Nom affiché</div>
@@ -614,13 +642,37 @@ const MODE_DEMO = firebaseConfig.apiKey.includes("TA_CLE");
   btn.onclick = () => { i < slides.length - 1 ? montrer(++i) : fermer(); };
   document.getElementById("obSkip").onclick = fermer;
 })();
-const DUREE_VIE_MS = 2 * 60 * 60 * 1000;
-const RAYON_PROXIMITE_M = 500;     // il faut être à moins de 500 m pour signaler/valider
+
+/* ============================================================
+   THÈME JOUR / NUIT
+   ============================================================ */
+(function theme() {
+  let nuit = false;
+  try { nuit = localStorage.getItem("dak_theme") === "nuit"; } catch {}
+  appliquerTheme(nuit);
+
+  document.getElementById("themeBtn").onclick = () => {
+    const actifNuit = !document.body.classList.contains("nuit");
+    appliquerTheme(actifNuit);
+    try { localStorage.setItem("dak_theme", actifNuit ? "nuit" : "jour"); } catch {}
+  };
+
+  function appliquerTheme(nuit) {
+    document.body.classList.toggle("nuit", nuit);
+    const b = document.getElementById("themeBtn");
+    if (b) b.textContent = nuit ? "☀️" : "🌙";
+    // Bascule aussi la couche de tuiles claire/sombre
+    if (window._majTuiles) window._majTuiles(nuit);
+  }
+  window._appliquerTheme = appliquerTheme;
+})();
+const DUREE_VIE_MS = 3 * 60 * 60 * 1000;   // expiration auto : 3h
+const RAYON_PROXIMITE_M = 1000;    // il faut être à moins de 1 km pour signaler/valider
 const SEUIL_CONFIRMATION = 5;      // 5 validations citoyennes → signalement confirmé
 const RAYON_NOTIF_M = 3000;        // premium : notifié si un signalement tombe à moins de 3 km
 const PRIX_PREMIUM = "3,50 €";
+const MAX_MEDIAS_3H = 10;          // max 10 publications avec photo/vocal par tranche de 3h
 const TYPES = {
-  coupeurs:      { nom: "Coupeurs de route",     ico: "🛑" },
   rassemblement: { nom: "Rassemblement anormal", ico: "👥" },
   caillassage:   { nom: "Caillassage",           ico: "⚠️" },
   barrage:       { nom: "Route bloquée",         ico: "🚧" }
@@ -691,9 +743,20 @@ if (!MODE_DEMO) {
    CARTE + secours hors-ligne
    ============================================================ */
 const map = L.map("map", { zoomControl: false }).setView([-12.81, 45.16], 11);
-const tuiles = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-  attribution: "&copy; OpenStreetMap &copy; CARTO", maxZoom: 19
-}).addTo(map);
+const TUILES_JOUR = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+const TUILES_NUIT = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+let tuiles = L.tileLayer(
+  document.body.classList.contains("nuit") ? TUILES_NUIT : TUILES_JOUR,
+  { attribution: "&copy; OpenStreetMap &copy; CARTO", maxZoom: 19 }
+).addTo(map);
+
+/* Permet au sélecteur de thème de changer la couche de carte */
+window._majTuiles = (nuit) => {
+  map.removeLayer(tuiles);
+  tuiles = L.tileLayer(nuit ? TUILES_NUIT : TUILES_JOUR,
+    { attribution: "&copy; OpenStreetMap &copy; CARTO", maxZoom: 19 }).addTo(map);
+  tuiles.on("tileerror", activerSecours);
+};
 
 let secoursActif = false;
 function activerSecours() {
@@ -727,6 +790,7 @@ setTimeout(() => { if (!document.querySelector(".leaflet-tile-loaded")) activerS
 let utilisateur = null;
 let confirmation = null;
 let recaptcha = null;
+let infosInscription = null;   // prénom/nom/naissance saisis à l'inscription
 
 /* ----- Profil : pseudo, points 🪨, identité ----- */
 let profil = null;          // { pseudo, points, identiteVerifiee }
@@ -754,7 +818,7 @@ function majUIProfil() {
 
     /* Premium : badge, masquage de l'offre, affichage du réglage notifications */
     const prem = !!profil.premium;
-    const tete = document.querySelector(".profil-tete > div");
+    const tete = document.getElementById("statutId").parentElement;
     let badgeP = document.getElementById("badgePremium");
     if (prem && !badgeP) {
       badgeP = document.createElement("div");
@@ -958,23 +1022,29 @@ btnSms.onclick = async () => {
     if (code.length < 6) { toast("Code à 6 chiffres requis", true); return; }
     btnSms.disabled = true;
     try {
+      const info = infosInscription || {};
       if (MODE_DEMO) {
         if (code !== "123456") throw new Error("code");
         utilisateur = { uid: "demo-" + Math.random().toString(36).slice(2, 8) };
-        profil = { pseudo: pseudoParDefaut(), points: 0, identiteVerifiee: false,
+        profil = { pseudo: pseudoParDefaut(),
+                   prenom: info.prenom || "", nom: info.nomFamille || "", naissance: info.naissance || "",
+                   points: 0, identiteVerifiee: false,
                    premium: false, notifActives: true };
         majProfil();
       } else {
         const cred = await confirmation.confirm(code);
         await fb.setDoc(fb.doc(fb.db, "utilisateurs", cred.user.uid), {
           role: "citoyen", telephoneVerifie: true,
-          pseudo: pseudoParDefaut(), points: 0, identiteVerifiee: false,
+          pseudo: pseudoParDefaut(),
+          prenom: info.prenom || "", nom: info.nomFamille || "", naissance: info.naissance || "",
+          points: 0, identiteVerifiee: false,
           premium: false, notifActives: true,
           fiabilite: 0, banni: false, creeLe: fb.serverTimestamp()
         }, { merge: true });
       }
       voileAuth.classList.remove("on");
       confirmation = null;
+      infosInscription = null;
       toast("Numéro vérifié — karibu ! 🌴");
     } catch (e) {
       console.error(e);
@@ -985,12 +1055,27 @@ btnSms.onclick = async () => {
   }
 
   /* ----- Étape 1 : envoi du SMS ----- */
+  // Identité obligatoire à l'inscription
+  const prenom = document.getElementById("prenomInput").value.trim();
+  const nomFamille = document.getElementById("nomFamilleInput").value.trim();
+  const naissance = document.getElementById("naissanceInput").value;
+  if (prenom.length < 2 || nomFamille.length < 2) {
+    toast("Renseigne ton prénom et ton nom", true); return;
+  }
+  if (!naissance) { toast("Renseigne ta date de naissance", true); return; }
+  // Contrôle d'âge (13 ans minimum, cohérent avec les CGU des apps grand public)
+  const age = (Date.now() - new Date(naissance).getTime()) / (365.25 * 864e5);
+  if (age < 13) { toast("Tu dois avoir au moins 13 ans", true); return; }
+  if (age > 120) { toast("Date de naissance invalide", true); return; }
+
   const indicatif = document.getElementById("indicatif").value;
   let num = document.getElementById("telInput").value.replace(/[\s.\-()]/g, "");
   if (num.startsWith("0")) num = num.slice(1);          // 0639… → 639…
   if (num.startsWith("+")) num = "";                    // pas de double indicatif
   if (!/^\d{6,12}$/.test(num)) { toast("Numéro invalide", true); return; }
   const numeroComplet = indicatif + num;                // format E.164, ex. +33612345678
+  // Mémorise pour la création du profil après validation du code
+  infosInscription = { prenom, nomFamille, naissance };
   btnSms.disabled = true;
   try {
     if (MODE_DEMO) {
@@ -1027,7 +1112,7 @@ function sauverEcoutes() {
 let audioEnCours = null;
 
 /* ----- Filtres par type ----- */
-const typesActifs = new Set(["coupeurs", "rassemblement", "caillassage", "barrage"]);
+const typesActifs = new Set(["rassemblement", "caillassage", "barrage"]);
 
 function appliquerFiltres() {
   Object.values(marqueurs).forEach(m => {
@@ -1043,15 +1128,13 @@ document.getElementById("filtres").addEventListener("click", (e) => {
   const f = b.dataset.f;
 
   if (f === "tous") {
-    // Bouton "tous" : réactive tout
-    ["coupeurs", "rassemblement", "caillassage", "barrage"].forEach(t => typesActifs.add(t));
+    ["rassemblement", "caillassage", "barrage"].forEach(t => typesActifs.add(t));
     document.querySelectorAll(".filtre").forEach(x => x.classList.add("actif"));
   } else {
     if (typesActifs.has(f)) typesActifs.delete(f); else typesActifs.add(f);
     b.classList.toggle("actif", typesActifs.has(f));
-    // Le bouton "tous" reste actif seulement si les 4 types sont visibles
     document.querySelector('[data-f="tous"]')
-      .classList.toggle("actif", typesActifs.size === 4);
+      .classList.toggle("actif", typesActifs.size === 3);
   }
   appliquerFiltres();
 });
@@ -1097,7 +1180,7 @@ if (!MODE_DEMO) {
 
   let idSeq = 1;
   [
-    { type:"coupeurs", niveau:3, lat:-12.7530, lng:45.1110, com:"Plusieurs individus, pierres sur la chaussée, sens Koungou → Mamoudzou", age:18, conf:7, verif:"Gendarmerie", photo:photoDemo, auteur:"Madi976" },
+    { type:"caillassage", niveau:3, lat:-12.7530, lng:45.1110, com:"Plusieurs individus, pierres sur la chaussée, sens Koungou → Mamoudzou", age:18, conf:7, verif:"Gendarmerie", photo:photoDemo, auteur:"Madi976" },
     { type:"rassemblement", niveau:2, lat:-12.7842, lng:45.2278, com:"Groupe important près du rond-point, ambiance tendue", age:42, conf:4, verif:null, photo:null, auteur:"Citoyen-K2F7" },
     { type:"barrage", niveau:2, lat:-12.8410, lng:45.1130, com:"Pneus sur la route, circulation alternée", age:65, conf:5, verif:"Gendarmerie", photo:null, auteur:"Zaza_976" },
     { type:"caillassage", niveau:3, lat:-12.7350, lng:45.0860, com:"Véhicules visés depuis le talus, rouler vitres fermées", age:25, conf:9, verif:null, photo:photoDemo, auteur:"Citoyen-9XPL" },
@@ -1357,6 +1440,20 @@ const voile = document.getElementById("voile");
 let choixType = null, choixNiveau = 2, choixPos = null, fichierPhoto = null, photoDataUrl = null;
 let fichierVoix = null, voixDataUrl = null;   // commentaire vocal
 let mediaRec = null, mediaChunks = [], recTimer = null, recDebut = 0;
+
+/* Limite : 10 publications avec photo/vocal par tranche glissante de 3h.
+   On garde les horodatages localement (par appareil). */
+let publicationsMedia = [];
+try { publicationsMedia = JSON.parse(localStorage.getItem("dak_pub_media") || "[]"); } catch {}
+function mediasRestants() {
+  const limite = Date.now() - DUREE_VIE_MS;   // 3h glissantes
+  publicationsMedia = publicationsMedia.filter(t => t > limite);
+  return MAX_MEDIAS_3H - publicationsMedia.length;
+}
+function enregistrerPublicationMedia() {
+  publicationsMedia.push(Date.now());
+  try { localStorage.setItem("dak_pub_media", JSON.stringify(publicationsMedia)); } catch {}
+}
 let marqueurTemp = null;
 
 document.getElementById("ouvrirSignal").onclick = () => {
@@ -1527,6 +1624,14 @@ function verifEnvoi() {
 document.getElementById("envoyer").onclick = async () => {
   if (!choixType || !choixPos || !utilisateur) return;
   const btn = document.getElementById("envoyer");
+
+  /* 🔒 Limite : 10 publications avec photo/vocal par tranche de 3h */
+  const avecMedia = !!(fichierPhoto || fichierVoix);
+  if (avecMedia && mediasRestants() <= 0) {
+    toast("Limite atteinte : 10 publications avec photo/vocal par 3h", true);
+    return;
+  }
+
   btn.disabled = true; btn.textContent = "Publication…";
 
   /* 📍 On ne peut signaler que si on est (ou vient de passer) sur place */
@@ -1594,6 +1699,7 @@ document.getElementById("envoyer").onclick = async () => {
       /* 🪨 Le point est attribué par la Cloud Function quand le signalement
          passe en "confirme" (5 validations) ou "verifie" (forces de l'ordre) */
     }
+    if (avecMedia) enregistrerPublicationMedia();
     fermerModal();
     toast("Alerte publiée sur DAKOUONE 🌴");
   } catch (e) {
