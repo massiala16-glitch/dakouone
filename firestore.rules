@@ -43,6 +43,22 @@ service cloud.firestore {
       }
     }
 
+    // ---- Signalements confidentiels (citoyens vérifiés → forces de l'ordre uniquement) ----
+    match /confidentiels/{id} {
+      // Lecture/traitement : forces de l'ordre uniquement (jamais le public)
+      allow read: if estForceOrdre();
+      allow update: if estForceOrdre();
+      allow delete: if estForceOrdre();
+
+      // Création : compte connecté, non banni, identité vérifiée
+      allow create: if connecte() && nonBanni()
+        && moi().identiteVerifiee == true
+        && request.resource.data.creePar == request.auth.uid
+        && request.resource.data.type in ['mouvement','rassemblement','vehicules','tension']
+        && request.resource.data.commentaire.size() <= 300
+        && request.resource.data.statut == 'nouveau';
+    }
+
     // ---- Utilisateurs ----
     match /utilisateurs/{uid} {
       allow read: if connecte() && (request.auth.uid == uid || estForceOrdre());

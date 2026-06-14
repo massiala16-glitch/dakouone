@@ -104,6 +104,20 @@
     display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(30,50,70,.15);
   }
 
+  /* ----- Signalement confidentiel ----- */
+  .confid-btn{
+    position:absolute;bottom:84px;right:16px;z-index:1000;width:46px;height:46px;border-radius:50%;
+    border:1px solid var(--officiel);background:var(--panel);color:var(--officiel);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(30,50,70,.15);
+    font-size:1.15rem;
+  }
+  .confid-banner{
+    background:rgba(29,78,216,.10);border:1px solid var(--officiel);border-radius:var(--radius);
+    padding:11px 13px;margin-bottom:16px;font-size:.76rem;color:#2f5fd0;line-height:1.5;
+  }
+  .confid-banner b{color:var(--officiel)}
+  .feuille.confid h2::before{content:"🔒 ";}
+
   .marq{position:relative}
   .marq .halo{position:absolute;inset:-14px;border-radius:50%;animation:halo 2s ease-out infinite}
   .marq.n3 .halo{background:radial-gradient(circle, rgba(255,83,64,.45), transparent 70%)}
@@ -471,6 +485,8 @@
   <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg>
 </button>
 
+<button class="confid-btn" id="confidBtn" title="Signalement confidentiel (autorités)">🔒</button>
+
 <!-- Modal auth téléphone -->
 <div class="voile" id="voileAuth">
   <div class="feuille">
@@ -544,6 +560,35 @@
     <div class="actions">
       <button class="annuler" id="annuler">Annuler</button>
       <button class="envoyer" id="envoyer" disabled>Publier l'alerte</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal signalement confidentiel -->
+<div class="voile" id="voileConfid">
+  <div class="feuille confid">
+    <h2>Signalement confidentiel</h2>
+    <p class="sous">Transmis directement et discrètement aux forces de l'ordre. <b>N'apparaît pas sur la carte publique.</b></p>
+
+    <div class="confid-banner">
+      🔒 Signale uniquement ce que <b>tu observes</b> (mouvement, attroupement, véhicules qui se positionnent…). Reste factuel, ne cible pas de personne. En danger immédiat, appelle le <b>17</b>.
+    </div>
+
+    <div class="label">Type de situation</div>
+    <div class="grille-types" id="typesConfid">
+      <button class="type-btn" data-t="mouvement"><span class="ico">🚶</span>Mouvement suspect</button>
+      <button class="type-btn" data-t="rassemblement"><span class="ico">👥</span>Attroupement qui se forme</button>
+      <button class="type-btn" data-t="vehicules"><span class="ico">🚗</span>Véhicules positionnés</button>
+      <button class="type-btn" data-t="tension"><span class="ico">⚡</span>Tension / pré-alerte</button>
+    </div>
+
+    <div class="pos-info" id="posInfoConfid">📍 Position : touche la carte ou le bouton GPS</div>
+
+    <textarea id="commentaireConfid" placeholder="Décris factuellement ce que tu observes (optionnel)" maxlength="300"></textarea>
+
+    <div class="actions">
+      <button class="annuler" id="annulerConfid">Annuler</button>
+      <button class="envoyer" id="envoyerConfid" disabled style="background:var(--officiel);color:#fff">Transmettre aux autorités</button>
     </div>
   </div>
 </div>
@@ -1708,6 +1753,105 @@ document.getElementById("envoyer").onclick = async () => {
   }
   btn.disabled = false; btn.textContent = "Publier l'alerte";
 };
+
+/* ============================================================
+   SIGNALEMENT CONFIDENTIEL (réservé identités vérifiées → autorités)
+   ============================================================ */
+const TYPES_CONFID = {
+  mouvement:     "Mouvement suspect",
+  rassemblement: "Attroupement qui se forme",
+  vehicules:     "Véhicules positionnés",
+  tension:       "Tension / pré-alerte"
+};
+const voileConfid = document.getElementById("voileConfid");
+let confidType = null, confidPos = null, confidMarqueurTemp = null;
+
+document.getElementById("confidBtn").onclick = () => {
+  if (!utilisateur) { ouvrirAuth(); return; }
+  if (!profil?.identiteVerifiee) {
+    toast("Réservé aux comptes à identité vérifiée", true);
+    document.getElementById("profilBtn").click();
+    return;
+  }
+  voileConfid.classList.add("on");
+  verifEnvoiConfid();
+};
+
+document.getElementById("annulerConfid").onclick = fermerConfid;
+function fermerConfid() {
+  voileConfid.classList.remove("on");
+  confidType = null; confidPos = null;
+  document.querySelectorAll("#typesConfid .type-btn").forEach(b => b.classList.remove("sel"));
+  document.getElementById("commentaireConfid").value = "";
+  document.getElementById("posInfoConfid").textContent = "📍 Position : touche la carte ou le bouton GPS";
+  if (confidMarqueurTemp) { map.removeLayer(confidMarqueurTemp); confidMarqueurTemp = null; }
+}
+
+document.getElementById("typesConfid").addEventListener("click", (e) => {
+  const b = e.target.closest(".type-btn"); if (!b) return;
+  document.querySelectorAll("#typesConfid .type-btn").forEach(x => x.classList.remove("sel"));
+  b.classList.add("sel"); confidType = b.dataset.t; verifEnvoiConfid();
+});
+
+map.on("click", (e) => {
+  if (voileConfid.classList.contains("on")) {
+    confidPos = e.latlng;
+    if (confidMarqueurTemp) map.removeLayer(confidMarqueurTemp);
+    confidMarqueurTemp = L.circleMarker(e.latlng, { radius: 9, color: "#1d4ed8", weight: 2, fillOpacity: .3 }).addTo(map);
+    document.getElementById("posInfoConfid").textContent =
+      `📍 Position : ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+    verifEnvoiConfid();
+  }
+});
+
+function verifEnvoiConfid() {
+  document.getElementById("envoyerConfid").disabled = !(confidType && confidPos);
+}
+
+document.getElementById("envoyerConfid").onclick = async () => {
+  if (!confidType || !confidPos || !utilisateur || !profil?.identiteVerifiee) return;
+  const btn = document.getElementById("envoyerConfid");
+  btn.disabled = true; btn.textContent = "Transmission…";
+
+  const ok = await verifierProximite(confidPos.lat, confidPos.lng, "signaler");
+  if (!ok) { btn.disabled = false; btn.textContent = "Transmettre aux autorités"; return; }
+
+  try {
+    if (MODE_DEMO) {
+      toast("Signalement confidentiel transmis aux autorités 🔒");
+    } else {
+      await fb.addDoc(fb.collection(fb.db, "confidentiels"), {
+        type: confidType,
+        position: new fb.GeoPoint(confidPos.lat, confidPos.lng),
+        commentaire: document.getElementById("commentaireConfid").value.trim(),
+        creePar: utilisateur.uid,
+        auteurPrenom: profil?.prenom || "", auteurNom: profil?.nom || "",
+        creeLe: fb.serverTimestamp(),
+        statut: "nouveau"
+      });
+      toast("Signalement confidentiel transmis 🔒");
+    }
+    fermerConfid();
+  } catch (e) {
+    console.error(e);
+    toast("Échec de transmission, réessaie", true);
+  }
+  btn.disabled = false; btn.textContent = "Transmettre aux autorités";
+};
+
+const _maPosClickConfid = () => {
+  if (!voileConfid.classList.contains("on")) return;
+  navigator.geolocation?.getCurrentPosition((p) => {
+    const ll = L.latLng(p.coords.latitude, p.coords.longitude);
+    map.setView(ll, 15);
+    confidPos = ll;
+    if (confidMarqueurTemp) map.removeLayer(confidMarqueurTemp);
+    confidMarqueurTemp = L.circleMarker(ll, { radius: 9, color: "#1d4ed8", weight: 2, fillOpacity: .3 }).addTo(map);
+    document.getElementById("posInfoConfid").textContent = "📍 Position GPS détectée ✓";
+    verifEnvoiConfid();
+  });
+};
+document.getElementById("maPos").addEventListener("click", _maPosClickConfid);
 
 /* ============================================================
    UTILITAIRES
