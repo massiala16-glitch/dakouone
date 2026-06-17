@@ -239,19 +239,19 @@
 
   /* ----- Enregistrement vocal : gros bouton rouge à maintenir ----- */
   .voix-zone{display:flex;align-items:center;gap:9px;margin-bottom:7px}
-  .voix-btn-maintien{
-    flex:1;display:flex;align-items:center;justify-content:center;gap:9px;
+  .voix-action{
+    flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
     border:1.5px solid var(--alerte);border-radius:var(--radius);
     background:rgba(255,83,64,.10);color:var(--alerte);
     padding:13px;cursor:pointer;font-family:inherit;font-weight:700;font-size:.85rem;
-    user-select:none;-webkit-user-select:none;touch-action:none;transition:background .12s;
+    transition:background .12s;
   }
-  .voix-btn-maintien .vb-ico{font-size:1.2rem}
-  .voix-btn-maintien.rec{
+  .voix-action .vb-ico{font-size:1.2rem}
+  .voix-action.arret{
     background:var(--alerte);color:#fff;border-color:var(--alerte);
     animation:pulseRec 1s ease-in-out infinite;
   }
-  .voix-btn-maintien.pret{border-color:var(--ok);background:rgba(15,174,116,.10);color:var(--ok)}
+  .voix-action.ecoute{border-color:var(--ok);background:rgba(15,174,116,.10);color:var(--ok)}
   @keyframes pulseRec{0%,100%{box-shadow:0 0 0 0 rgba(255,83,64,.45)}50%{box-shadow:0 0 0 9px rgba(255,83,64,0)}}
   .voix-suppr{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1rem;flex:none;padding:6px}
 
@@ -279,6 +279,13 @@
   .tel-ligne{display:flex;gap:8px;margin-bottom:14px}
   .id-ligne{display:flex;gap:8px}
   .id-ligne .champ{flex:1}
+  .btn-google{
+    width:100%;display:flex;align-items:center;justify-content:center;gap:10px;
+    background:#fff;color:#3c4043;border:1px solid #dadce0;border-radius:var(--radius);
+    padding:13px;font-family:inherit;font-size:.9rem;font-weight:600;cursor:pointer;
+  }
+  .btn-google:active{background:#f7f8f8}
+  body.nuit .btn-google{background:#1e2733;color:#e8edf3;border-color:#2a3442}
 
   /* ----- Profil & points ----- */
   .points-pill{
@@ -544,40 +551,63 @@
 <!-- Modal auth téléphone -->
 <div class="voile" id="voileAuth">
   <div class="feuille">
-    <h2>Vérifie ton numéro</h2>
-    <p class="sous">Obligatoire pour publier un signalement. La carte reste consultable sans compte.</p>
 
-    <div class="label">Identité</div>
-    <div class="id-ligne">
-      <input class="champ" id="prenomInput" type="text" placeholder="Prénom" autocomplete="given-name">
-      <input class="champ" id="nomFamilleInput" type="text" placeholder="Nom" autocomplete="family-name">
+    <!-- Écran de choix initial -->
+    <div id="authChoix">
+      <h2>Bienvenue sur DAKOUONE 🌴</h2>
+      <p class="sous">Un compte est nécessaire pour publier. La carte reste consultable sans compte.</p>
+      <button class="envoyer" id="choixCreer" style="width:100%;margin-bottom:10px">Créer un compte</button>
+      <button class="annuler" id="choixConnexion" style="width:100%;margin-bottom:10px">J'ai déjà un compte — me connecter</button>
+      <button class="btn-google" id="choixGoogle">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Continuer avec Google
+      </button>
+      <div class="actions" style="margin-top:14px">
+        <button class="annuler" id="authAnnuler2" style="width:100%;background:none;color:var(--muted)">Plus tard</button>
+      </div>
     </div>
-    <input class="champ" id="naissanceInput" type="date" autocomplete="bday" aria-label="Date de naissance">
 
-    <div class="label">Numéro de téléphone</div>
-    <div class="tel-ligne">
-      <select class="indicatif" id="indicatif">
-        <option value="+262" selected>🇾🇹 +262</option>
-        <option value="+33">🇫🇷 +33</option>
-        <option value="+269">🇰🇲 +269</option>
-        <option value="+261">🇲🇬 +261</option>
-        <option value="+230">🇲🇺 +230</option>
-        <option value="+32">🇧🇪 +32</option>
-        <option value="+41">🇨🇭 +41</option>
-        <option value="+1">🇺🇸 +1</option>
-        <option value="+44">🇬🇧 +44</option>
-      </select>
-      <input class="champ" id="telInput" type="tel" placeholder="639 XX XX XX" inputmode="numeric" autocomplete="tel">
+    <!-- Formulaire (inscription OU connexion) -->
+    <div id="authForm" style="display:none">
+      <h2 id="authTitre">Créer un compte</h2>
+      <p class="sous" id="authSous">Renseigne tes infos pour créer ton compte.</p>
+
+      <!-- Identité : seulement à l'inscription -->
+      <div id="blocIdentite">
+        <div class="label">Identité</div>
+        <div class="id-ligne">
+          <input class="champ" id="prenomInput" type="text" placeholder="Prénom" autocomplete="given-name">
+          <input class="champ" id="nomFamilleInput" type="text" placeholder="Nom" autocomplete="family-name">
+        </div>
+        <input class="champ" id="naissanceInput" type="date" autocomplete="bday" aria-label="Date de naissance">
+      </div>
+
+      <div class="label">Numéro de téléphone</div>
+      <div class="tel-ligne">
+        <select class="indicatif" id="indicatif">
+          <option value="+262" selected>🇾🇹 +262</option>
+          <option value="+33">🇫🇷 +33</option>
+          <option value="+269">🇰🇲 +269</option>
+          <option value="+261">🇲🇬 +261</option>
+          <option value="+230">🇲🇺 +230</option>
+          <option value="+32">🇧🇪 +32</option>
+          <option value="+41">🇨🇭 +41</option>
+          <option value="+1">🇺🇸 +1</option>
+          <option value="+44">🇬🇧 +44</option>
+        </select>
+        <input class="champ" id="telInput" type="tel" placeholder="639 XX XX XX" inputmode="numeric" autocomplete="tel">
+      </div>
+      <div class="code-ligne" id="codeLigne">
+        <div class="label">Code reçu par SMS</div>
+        <input class="champ" id="codeInput" type="text" placeholder="123456" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
+      </div>
+      <p class="auth-info">Ton numéro et ta date de naissance ne sont jamais affichés publiquement. Ils servent uniquement à responsabiliser les signalements.</p>
+      <div class="actions">
+        <button class="annuler" id="authRetour">Retour</button>
+        <button class="envoyer" id="btn-sms">Recevoir le code</button>
+      </div>
     </div>
-    <div class="code-ligne" id="codeLigne">
-      <div class="label">Code reçu par SMS</div>
-      <input class="champ" id="codeInput" type="text" placeholder="123456" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
-    </div>
-    <p class="auth-info">Ton numéro et ta date de naissance ne sont jamais affichés publiquement. Ils servent uniquement à responsabiliser les signalements.</p>
-    <div class="actions">
-      <button class="annuler" id="authAnnuler">Plus tard</button>
-      <button class="envoyer" id="btn-sms">Recevoir le code</button>
-    </div>
+
   </div>
 </div>
 
@@ -604,9 +634,14 @@
     <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
 
     <div class="voix-zone">
-      <button type="button" class="voix-btn-maintien" id="voixBtn">
-        <span class="vb-ico">🎙️</span>
-        <span class="vb-txt" id="voixInfo">Maintiens pour enregistrer un vocal</span>
+      <button type="button" class="voix-action" id="voixEnreg">
+        <span class="vb-ico">🎙️</span> Enregistrer un vocal
+      </button>
+      <button type="button" class="voix-action arret" id="voixStop" style="display:none">
+        <span class="vb-ico">⏹️</span> <span id="voixChrono">Arrêter (0s)</span>
+      </button>
+      <button type="button" class="voix-action ecoute" id="voixPlay" style="display:none">
+        <span class="vb-ico">🔊</span> <span id="voixInfo">Réécouter</span>
       </button>
       <button type="button" class="voix-suppr" id="voixSuppr" style="display:none" title="Supprimer">✕</button>
     </div>
@@ -1018,7 +1053,9 @@ function majUIProfil() {
   pill.classList.toggle("on", !!(utilisateur && profil));
   if (profil) {
     document.getElementById("pointsVal").textContent = profil.points || 0;
-    document.getElementById("profilNom").textContent = profil.pseudo || "—";
+    // Nom affiché en haut : prénom + nom si dispo, sinon le pseudo
+    const nomComplet = `${profil.prenom || ""} ${profil.nom || ""}`.trim();
+    document.getElementById("profilNom").textContent = nomComplet || profil.pseudo || "—";
     document.getElementById("profilPoints").textContent = profil.points || 0;
     const st = document.getElementById("statutId");
     const ok = !!profil.identiteVerifiee;
@@ -1097,21 +1134,87 @@ if (!MODE_DEMO) {
 const voileAuth = document.getElementById("voileAuth");
 const btnSms = document.getElementById("btn-sms");
 const codeLigne = document.getElementById("codeLigne");
+let modeAuth = "creer";   // "creer" ou "connexion"
 
 function ouvrirAuth() {
   voileAuth.classList.add("on");
+  // On montre d'abord l'écran de choix
+  document.getElementById("authChoix").style.display = "block";
+  document.getElementById("authForm").style.display = "none";
   codeLigne.classList.remove("on");
   btnSms.textContent = "Recevoir le code";
   btnSms.disabled = false;
   confirmation = null;
-  // Recrée un reCAPTCHA propre s'il n'existe pas (ex. après déconnexion)
+}
+
+function prepararFormAuth() {
+  // Affiche le formulaire, configure selon le mode (créer / connexion)
+  document.getElementById("authChoix").style.display = "none";
+  document.getElementById("authForm").style.display = "block";
+  const creer = modeAuth === "creer";
+  document.getElementById("blocIdentite").style.display = creer ? "block" : "none";
+  document.getElementById("authTitre").textContent = creer ? "Créer un compte" : "Me connecter";
+  document.getElementById("authSous").textContent = creer
+    ? "Renseigne tes infos pour créer ton compte."
+    : "Entre ton numéro pour recevoir ton code de connexion.";
+  codeLigne.classList.remove("on");
+  btnSms.textContent = "Recevoir le code";
+  btnSms.disabled = false;
+  confirmation = null;
+  // reCAPTCHA propre à chaque ouverture du formulaire
   if (!MODE_DEMO) {
     if (recaptcha) { try { recaptcha.clear(); } catch {} recaptcha = null; }
     recaptcha = new fb.RecaptchaVerifier(fb.auth, "btn-sms", { size: "invisible" });
   }
 }
 
-document.getElementById("authAnnuler").onclick = () => voileAuth.classList.remove("on");
+document.getElementById("choixCreer").onclick = () => { modeAuth = "creer"; prepararFormAuth(); };
+document.getElementById("choixConnexion").onclick = () => { modeAuth = "connexion"; prepararFormAuth(); };
+document.getElementById("authAnnuler2").onclick = () => voileAuth.classList.remove("on");
+
+/* ----- Connexion avec Google (multi-appareils, sans SMS) ----- */
+document.getElementById("choixGoogle").onclick = async () => {
+  if (MODE_DEMO) {
+    utilisateur = { uid: "demo-google-" + Math.random().toString(36).slice(2, 8) };
+    profil = { pseudo: pseudoParDefaut(), prenom: "", nom: "", naissance: "",
+               points: 0, identiteVerifiee: false, premium: false, notifActives: true };
+    majProfil();
+    voileAuth.classList.remove("on");
+    toast("Connecté avec Google (démo) 🌴");
+    return;
+  }
+  try {
+    const provider = new fb.GoogleAuthProvider();
+    const cred = await fb.signInWithPopup(fb.auth, provider);
+    const refProfil = fb.doc(fb.db, "utilisateurs", cred.user.uid);
+    const dejaLa = await fb.getDoc(refProfil);
+    if (!dejaLa.exists()) {
+      // Premier passage via Google : on récupère le nom depuis le compte Google
+      const nomGoogle = (cred.user.displayName || "").trim().split(" ");
+      await fb.setDoc(refProfil, {
+        role: "citoyen", telephoneVerifie: false,
+        pseudo: pseudoParDefaut(),
+        prenom: nomGoogle[0] || "", nom: nomGoogle.slice(1).join(" ") || "", naissance: "",
+        email: cred.user.email || "",
+        points: 0, identiteVerifiee: false,
+        premium: false, notifActives: true,
+        fiabilite: 0, banni: false, creeLe: fb.serverTimestamp()
+      });
+    }
+    voileAuth.classList.remove("on");
+    toast("Connecté avec Google 🌴");
+  } catch (e) {
+    console.error(e);
+    if (e.code !== "auth/popup-closed-by-user") toast("Connexion Google impossible", true);
+  }
+};
+
+document.getElementById("authRetour").onclick = () => {
+  // Retour à l'écran de choix
+  document.getElementById("authChoix").style.display = "block";
+  document.getElementById("authForm").style.display = "none";
+  if (recaptcha) { try { recaptcha.clear(); } catch {} recaptcha = null; }
+};
 
 /* Placeholder adapté au pays choisi */
 const exemples = { "+262":"639 XX XX XX", "+33":"6 12 34 56 78", "+269":"3XX XX XX",
@@ -1274,11 +1377,19 @@ btnSms.onclick = async () => {
         majProfil();
       } else {
         const cred = await confirmation.confirm(code);
-        // Crée le profil UNIQUEMENT à la première inscription.
-        // À la reconnexion d'un compte existant, on ne réécrit rien (sinon refus de permission).
         const refProfil = fb.doc(fb.db, "utilisateurs", cred.user.uid);
         const dejaLa = await fb.getDoc(refProfil);
+
+        if (modeAuth === "connexion" && !dejaLa.exists()) {
+          // Tentative de connexion mais aucun compte → on déconnecte et on invite à créer
+          await fb.signOut(fb.auth);
+          btnSms.disabled = false;
+          toast("Aucun compte avec ce numéro. Crée un compte d'abord.", true);
+          return;
+        }
+
         if (!dejaLa.exists()) {
+          // Création du compte (premier passage)
           await fb.setDoc(refProfil, {
             role: "citoyen", telephoneVerifie: true,
             pseudo: pseudoParDefaut(),
@@ -1288,11 +1399,12 @@ btnSms.onclick = async () => {
             fiabilite: 0, banni: false, creeLe: fb.serverTimestamp()
           });
         }
+        // Si le compte existe déjà → on ne réécrit rien, simple connexion
       }
       voileAuth.classList.remove("on");
       confirmation = null;
       infosInscription = null;
-      toast("Numéro vérifié — karibu ! 🌴");
+      toast(modeAuth === "connexion" ? "Reconnecté — karibu ! 🌴" : "Compte créé — karibu ! 🌴");
     } catch (e) {
       console.error(e);
       toast("Code incorrect, réessaie", true);
@@ -1302,18 +1414,20 @@ btnSms.onclick = async () => {
   }
 
   /* ----- Étape 1 : envoi du SMS ----- */
-  // Identité obligatoire à l'inscription
-  const prenom = document.getElementById("prenomInput").value.trim();
-  const nomFamille = document.getElementById("nomFamilleInput").value.trim();
-  const naissance = document.getElementById("naissanceInput").value;
-  if (prenom.length < 2 || nomFamille.length < 2) {
-    toast("Renseigne ton prénom et ton nom", true); return;
+  // Identité obligatoire UNIQUEMENT à la création de compte
+  let prenom = "", nomFamille = "", naissance = "";
+  if (modeAuth === "creer") {
+    prenom = document.getElementById("prenomInput").value.trim();
+    nomFamille = document.getElementById("nomFamilleInput").value.trim();
+    naissance = document.getElementById("naissanceInput").value;
+    if (prenom.length < 2 || nomFamille.length < 2) {
+      toast("Renseigne ton prénom et ton nom", true); return;
+    }
+    if (!naissance) { toast("Renseigne ta date de naissance", true); return; }
+    const age = (Date.now() - new Date(naissance).getTime()) / (365.25 * 864e5);
+    if (age < 13) { toast("Tu dois avoir au moins 13 ans", true); return; }
+    if (age > 120) { toast("Date de naissance invalide", true); return; }
   }
-  if (!naissance) { toast("Renseigne ta date de naissance", true); return; }
-  // Contrôle d'âge (13 ans minimum, cohérent avec les CGU des apps grand public)
-  const age = (Date.now() - new Date(naissance).getTime()) / (365.25 * 864e5);
-  if (age < 13) { toast("Tu dois avoir au moins 13 ans", true); return; }
-  if (age > 120) { toast("Date de naissance invalide", true); return; }
 
   const indicatif = document.getElementById("indicatif").value;
   let num = document.getElementById("telInput").value.replace(/[\s.\-()]/g, "");
@@ -1321,7 +1435,7 @@ btnSms.onclick = async () => {
   if (num.startsWith("+")) num = "";                    // pas de double indicatif
   if (!/^\d{6,12}$/.test(num)) { toast("Numéro invalide", true); return; }
   const numeroComplet = indicatif + num;                // format E.164, ex. +33612345678
-  // Mémorise pour la création du profil après validation du code
+  // Mémorise pour la création du profil (vide si connexion)
   infosInscription = { prenom, nomFamille, naissance };
   btnSms.disabled = true;
   try {
@@ -1783,12 +1897,9 @@ document.getElementById("annuler").onclick = fermerModal;
 function fermerModal() {
   voile.classList.remove("on");
   choixType = null; choixPos = null; fichierPhoto = null; photoDataUrl = null;
-  arreterVoix(); fichierVoix = null; voixDataUrl = null; enregistreEnCours = false;
+  arreterVoix(); fichierVoix = null; voixDataUrl = null;
   if (apercuAudio) { apercuAudio.pause(); apercuAudio = null; }
-  voixBtn.classList.remove("rec", "pret");
-  voixBtn.querySelector(".vb-ico").textContent = "🎙️";
-  voixInfo.textContent = "Maintiens pour enregistrer un vocal";
-  voixSuppr.style.display = "none";
+  resetBoutonsVoix();
   document.querySelectorAll(".type-btn").forEach(b => b.classList.remove("sel"));
   document.getElementById("commentaire").value = "";
   document.getElementById("photoZone").innerHTML = "📷 Ajouter une photo (optionnel)";
@@ -1860,18 +1971,26 @@ function compresser(fichier, maxDim = 800, qualite = 0.7) {
   });
 }
 
-/* ----- Commentaire vocal : MAINTENIR pour enregistrer, RELÂCHER pour arrêter (1 min max) ----- */
+/* ----- Commentaire vocal : bouton ENREGISTRER + bouton ARRÊTER (1 min max) ----- */
 const DUREE_VOIX_MAX = 60; // secondes
-const voixBtn = document.getElementById("voixBtn");
+const voixEnreg = document.getElementById("voixEnreg");
+const voixStop = document.getElementById("voixStop");
+const voixPlay = document.getElementById("voixPlay");
+const voixChrono = document.getElementById("voixChrono");
 const voixInfo = document.getElementById("voixInfo");
 const voixSuppr = document.getElementById("voixSuppr");
-let enregistreEnCours = false;
 let apercuAudio = null;   // pour réécouter son vocal avant publication
 
-async function demarrerVoix() {
-  if (enregistreEnCours || fichierVoix) return;            // déjà en cours ou déjà enregistré
+function resetBoutonsVoix() {
+  voixEnreg.style.display = "flex";
+  voixStop.style.display = "none";
+  voixPlay.style.display = "none";
+  voixSuppr.style.display = "none";
+}
+
+/* Démarrer l'enregistrement */
+voixEnreg.onclick = async () => {
   if (!navigator.mediaDevices?.getUserMedia) { toast("Micro non disponible", true); return; }
-  enregistreEnCours = true;
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     mediaChunks = [];
@@ -1880,91 +1999,60 @@ async function demarrerVoix() {
     mediaRec.onstop = () => {
       stream.getTracks().forEach(t => t.stop());
       clearInterval(recTimer);
-      voixBtn.classList.remove("rec");
       if (mediaChunks.length) {
         fichierVoix = new Blob(mediaChunks, { type: mediaRec.mimeType || "audio/webm" });
         voixDataUrl = URL.createObjectURL(fichierVoix);
         const sec = Math.min(DUREE_VOIX_MAX, Math.round((Date.now() - recDebut) / 1000));
-        voixBtn.classList.add("pret");
-        voixBtn.querySelector(".vb-ico").textContent = "🔊";
-        voixInfo.textContent = `Vocal enregistré · ${sec}s · touche pour réécouter`;
+        // Affiche les boutons réécouter + supprimer
+        voixEnreg.style.display = "none";
+        voixStop.style.display = "none";
+        voixPlay.style.display = "flex";
+        voixInfo.textContent = `Réécouter (${sec}s)`;
         voixSuppr.style.display = "block";
       } else {
-        voixInfo.textContent = "Maintiens pour enregistrer un vocal";
+        resetBoutonsVoix();
       }
-      enregistreEnCours = false;
     };
     mediaRec.start();
     recDebut = Date.now();
-    voixBtn.classList.add("rec");
-    voixBtn.querySelector(".vb-ico").textContent = "⏺️";
-    let reste = DUREE_VOIX_MAX;
-    voixInfo.textContent = `Enregistrement… relâche pour arrêter (${reste}s)`;
+    // Affiche le bouton arrêter
+    voixEnreg.style.display = "none";
+    voixStop.style.display = "flex";
+    let sec = 0;
+    voixChrono.textContent = "Arrêter (0s)";
     recTimer = setInterval(() => {
-      reste--;
-      if (reste <= 0) {
-        clearInterval(recTimer);          // stoppe le décompte tout de suite
-        voixInfo.textContent = "Enregistrement… (1 min max atteint)";
-        arreterVoix();                     // coupe à 1 min pile
-        return;
-      }
-      voixInfo.textContent = `Enregistrement… relâche pour arrêter (${reste}s)`;
+      sec++;
+      if (sec >= DUREE_VOIX_MAX) { voixChrono.textContent = "Arrêter (1min max)"; arreterVoix(); return; }
+      voixChrono.textContent = `Arrêter (${sec}s)`;
     }, 1000);
   } catch {
-    enregistreEnCours = false;
     toast("Autorise le micro pour enregistrer", true);
   }
-}
+};
 
+/* Arrêter l'enregistrement */
 function arreterVoix() {
   if (mediaRec && mediaRec.state === "recording") mediaRec.stop();
-  else { clearInterval(recTimer); voixBtn.classList.remove("rec"); enregistreEnCours = false; }
+  clearInterval(recTimer);
 }
+voixStop.onclick = arreterVoix;
 
-/* Réécoute du vocal qu'on vient d'enregistrer (avant publication, écoutes illimitées) */
-function reecouterApercu() {
+/* Réécouter le vocal enregistré (avant publication, illimité) */
+voixPlay.onclick = () => {
   if (!voixDataUrl) return;
   if (apercuAudio) { apercuAudio.pause(); apercuAudio = null; }
   apercuAudio = new Audio(voixDataUrl);
   apercuAudio.play().catch(() => {});
-}
+};
 
-/* Le bouton vocal a 2 états :
-   - état "vierge" → appui maintenu = enregistrer
-   - état "prêt" (vocal enregistré) → clic simple = réécouter */
-let appuiDebut = 0;
-function gererAppui(e) {
-  if (e.cancelable) e.preventDefault();
-  if (fichierVoix) return;          // déjà enregistré : on ne réenregistre pas par-dessus
-  appuiDebut = Date.now();
-  demarrerVoix();
-}
-function gererRelache(e) {
-  if (e.cancelable) e.preventDefault();
-  if (fichierVoix && !enregistreEnCours) {
-    // Vocal déjà prêt → un simple tap réécoute
-    if (Date.now() - appuiDebut < 300) reecouterApercu();
-    return;
-  }
-  arreterVoix();
-}
-
-voixBtn.addEventListener("mousedown", gererAppui);
-voixBtn.addEventListener("mouseup", gererRelache);
-voixBtn.addEventListener("mouseleave", () => { if (enregistreEnCours) arreterVoix(); });
-voixBtn.addEventListener("touchstart", gererAppui, { passive: false });
-voixBtn.addEventListener("touchend", gererRelache, { passive: false });
-voixBtn.addEventListener("touchcancel", () => { if (enregistreEnCours) arreterVoix(); });
-
+/* Supprimer le vocal pour réenregistrer */
 voixSuppr.onclick = (e) => {
   e.stopPropagation();
   if (apercuAudio) { apercuAudio.pause(); apercuAudio = null; }
+  if (mediaRec && mediaRec.state === "recording") { try { mediaRec.stop(); } catch {} }
+  clearInterval(recTimer);
   fichierVoix = null; voixDataUrl = null;
-  enregistreEnCours = false;
-  voixBtn.classList.remove("pret", "rec");
-  voixBtn.querySelector(".vb-ico").textContent = "🎙️";
-  voixInfo.textContent = "Maintiens pour enregistrer un vocal";
-  voixSuppr.style.display = "none";
+  resetBoutonsVoix();
 };
 
 function verifEnvoi() {
