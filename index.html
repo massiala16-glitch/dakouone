@@ -306,6 +306,21 @@
   }
   .statut-id.non{background:rgba(139,152,168,.12);border:1px solid #d9e2ea;color:var(--muted)}
   .statut-id.oui{background:rgba(53,201,142,.12);border:1px solid var(--ok);color:var(--ok)}
+
+  /* ----- Bloc coordonnées du compte ----- */
+  .coords-compte{
+    background:var(--panel2);border:1px solid #d9e2ea;border-radius:var(--radius);
+    padding:13px 15px;margin:14px 0;
+  }
+  body.nuit .coords-compte{border-color:#2a3442}
+  .coords-titre{font-size:.82rem;font-weight:700;color:var(--ink);margin-bottom:10px}
+  .coords-titre span{color:var(--muted);font-weight:500;font-size:.72rem}
+  .coords-ligne{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:.85rem;border-bottom:1px solid rgba(217,226,234,.5)}
+  body.nuit .coords-ligne{border-bottom-color:#222d3a}
+  .coords-ligne:last-of-type{border-bottom:none}
+  .coords-ligne span{color:var(--muted)}
+  .coords-ligne b{color:var(--ink);font-weight:600}
+  .coords-note{font-size:.68rem;color:var(--muted);line-height:1.4;margin-top:9px}
   .ligne-nom{display:flex;gap:8px}
   .ligne-nom .champ{flex:1;margin-bottom:0}
   .ligne-nom button{
@@ -654,6 +669,16 @@
 
     <button class="btn-verif-id" id="btnVerifId">🪪 Vérifier mon identité</button>
 
+    <!-- Coordonnées du compte (privées, visibles seulement par l'utilisateur) -->
+    <div class="coords-compte" id="coordsCompte">
+      <div class="coords-titre">Mes coordonnées <span>(privées)</span></div>
+      <div class="coords-ligne"><span>Prénom</span><b id="cPrenom">—</b></div>
+      <div class="coords-ligne"><span>Nom</span><b id="cNom">—</b></div>
+      <div class="coords-ligne"><span>Date de naissance</span><b id="cNaissance">—</b></div>
+      <div class="coords-ligne"><span>Téléphone</span><b id="cTel">—</b></div>
+      <p class="coords-note">Ces informations ne sont jamais affichées publiquement. Seul ton pseudo est visible des autres utilisateurs.</p>
+    </div>
+
     <!-- Bloc abonnement / notifications -->
     <div class="toggle-notif" id="toggleNotifWrap" style="display:none">
       <div>
@@ -680,6 +705,16 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- Avertissement de modération -->
+<div class="voile" id="avertBox">
+  <div class="feuille" style="max-width:380px">
+    <div style="text-align:center;font-size:2.4rem;margin-bottom:6px">⚠️</div>
+    <h2 style="text-align:center;color:var(--alerte)">Avertissement</h2>
+    <p id="avertTexte" style="font-size:.92rem;line-height:1.5;color:var(--ink);margin:12px 0 18px;text-align:center"></p>
+    <button class="envoyer" id="avertOk" style="width:100%;background:var(--alerte);color:#fff">J'ai compris</button>
+  </div>
+</div>
 
 <script type="module">
 /* ============================================================
@@ -971,6 +1006,13 @@ function pseudoParDefaut() {
   return "Citoyen-" + Math.random().toString(36).slice(2, 6).toUpperCase();
 }
 
+/* Formate "2000-05-14" → "14/05/2000" */
+function formaterDate(iso) {
+  if (!iso) return "—";
+  const p = String(iso).split("-");
+  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
+}
+
 function majUIProfil() {
   const pill = document.getElementById("pointsPill");
   pill.classList.toggle("on", !!(utilisateur && profil));
@@ -986,6 +1028,14 @@ function majUIProfil() {
     document.getElementById("nomSauver").disabled = !ok;
     document.getElementById("hintNom").style.display = ok ? "none" : "block";
     document.getElementById("btnVerifId").style.display = ok ? "none" : "block";
+
+    /* Coordonnées privées du compte */
+    document.getElementById("cPrenom").textContent = profil.prenom || "—";
+    document.getElementById("cNom").textContent = profil.nom || "—";
+    document.getElementById("cNaissance").textContent = formaterDate(profil.naissance);
+    // Le numéro vient de l'auth Firebase (utilisateur.phoneNumber), pas du profil Firestore
+    document.getElementById("cTel").textContent =
+      (utilisateur && utilisateur.phoneNumber) ? utilisateur.phoneNumber : "—";
 
     /* Premium : badge, masquage de l'offre, affichage du réglage notifications */
     const prem = !!profil.premium;
@@ -1011,7 +1061,21 @@ function ecouterProfil(uid) {
   stopProfil = fb.onSnapshot(fb.doc(fb.db, "utilisateurs", uid), (d) => {
     profil = d.data() || null;
     majUIProfil();
+    // Avertissement de modération non lu → on l'affiche une fois
+    const av = profil?.avertissementActif;
+    if (av && av.lu === false) {
+      afficherAvertissement(av.message);
+      // Marque comme lu (la règle autorise l'écriture de ce champ par le propriétaire)
+      fb.updateDoc(fb.doc(fb.db, "utilisateurs", uid),
+        { "avertissementActif.lu": true }).catch(() => {});
+    }
   });
+}
+
+function afficherAvertissement(message) {
+  const box = document.getElementById("avertBox");
+  document.getElementById("avertTexte").textContent = message;
+  box.classList.add("on");
 }
 
 function majProfil() {
@@ -1038,8 +1102,11 @@ function ouvrirAuth() {
   voileAuth.classList.add("on");
   codeLigne.classList.remove("on");
   btnSms.textContent = "Recevoir le code";
+  btnSms.disabled = false;
   confirmation = null;
-  if (!MODE_DEMO && !recaptcha) {
+  // Recrée un reCAPTCHA propre s'il n'existe pas (ex. après déconnexion)
+  if (!MODE_DEMO) {
+    if (recaptcha) { try { recaptcha.clear(); } catch {} recaptcha = null; }
     recaptcha = new fb.RecaptchaVerifier(fb.auth, "btn-sms", { size: "invisible" });
   }
 }
@@ -1070,6 +1137,9 @@ document.getElementById("voileProfil").addEventListener("click", (e) => {
 document.getElementById("btnDeco").onclick = async () => {
   if (!MODE_DEMO) await fb.signOut(fb.auth);
   else { utilisateur = null; }
+  // Nettoie le reCAPTCHA pour qu'une reconnexion fonctionne
+  if (recaptcha) { try { recaptcha.clear(); } catch {} recaptcha = null; }
+  confirmation = null;
   document.getElementById("voileProfil").classList.remove("on");
   majProfil();
   toast("Déconnecté");
@@ -1713,7 +1783,8 @@ document.getElementById("annuler").onclick = fermerModal;
 function fermerModal() {
   voile.classList.remove("on");
   choixType = null; choixPos = null; fichierPhoto = null; photoDataUrl = null;
-  arreterVoix(); fichierVoix = null; voixDataUrl = null;
+  arreterVoix(); fichierVoix = null; voixDataUrl = null; enregistreEnCours = false;
+  if (apercuAudio) { apercuAudio.pause(); apercuAudio = null; }
   voixBtn.classList.remove("rec", "pret");
   voixBtn.querySelector(".vb-ico").textContent = "🎙️";
   voixInfo.textContent = "Maintiens pour enregistrer un vocal";
@@ -1795,6 +1866,7 @@ const voixBtn = document.getElementById("voixBtn");
 const voixInfo = document.getElementById("voixInfo");
 const voixSuppr = document.getElementById("voixSuppr");
 let enregistreEnCours = false;
+let apercuAudio = null;   // pour réécouter son vocal avant publication
 
 async function demarrerVoix() {
   if (enregistreEnCours || fichierVoix) return;            // déjà en cours ou déjà enregistré
@@ -1814,8 +1886,8 @@ async function demarrerVoix() {
         voixDataUrl = URL.createObjectURL(fichierVoix);
         const sec = Math.min(DUREE_VOIX_MAX, Math.round((Date.now() - recDebut) / 1000));
         voixBtn.classList.add("pret");
-        voixBtn.querySelector(".vb-ico").textContent = "✓";
-        voixInfo.textContent = `Vocal enregistré · ${sec}s`;
+        voixBtn.querySelector(".vb-ico").textContent = "🔊";
+        voixInfo.textContent = `Vocal enregistré · ${sec}s · touche pour réécouter`;
         voixSuppr.style.display = "block";
       } else {
         voixInfo.textContent = "Maintiens pour enregistrer un vocal";
@@ -1849,17 +1921,47 @@ function arreterVoix() {
   else { clearInterval(recTimer); voixBtn.classList.remove("rec"); enregistreEnCours = false; }
 }
 
-// Souris (PC) + tactile (mobile) : appui = enregistre, relâchement = stop
-voixBtn.addEventListener("mousedown", (e) => { e.preventDefault(); demarrerVoix(); });
-voixBtn.addEventListener("mouseup", arreterVoix);
-voixBtn.addEventListener("mouseleave", () => { if (enregistreEnCours) arreterVoix(); });
-voixBtn.addEventListener("touchstart", (e) => { e.preventDefault(); demarrerVoix(); }, { passive: false });
-voixBtn.addEventListener("touchend", (e) => { e.preventDefault(); arreterVoix(); }, { passive: false });
-voixBtn.addEventListener("touchcancel", arreterVoix);
+/* Réécoute du vocal qu'on vient d'enregistrer (avant publication, écoutes illimitées) */
+function reecouterApercu() {
+  if (!voixDataUrl) return;
+  if (apercuAudio) { apercuAudio.pause(); apercuAudio = null; }
+  apercuAudio = new Audio(voixDataUrl);
+  apercuAudio.play().catch(() => {});
+}
 
-voixSuppr.onclick = () => {
+/* Le bouton vocal a 2 états :
+   - état "vierge" → appui maintenu = enregistrer
+   - état "prêt" (vocal enregistré) → clic simple = réécouter */
+let appuiDebut = 0;
+function gererAppui(e) {
+  if (e.cancelable) e.preventDefault();
+  if (fichierVoix) return;          // déjà enregistré : on ne réenregistre pas par-dessus
+  appuiDebut = Date.now();
+  demarrerVoix();
+}
+function gererRelache(e) {
+  if (e.cancelable) e.preventDefault();
+  if (fichierVoix && !enregistreEnCours) {
+    // Vocal déjà prêt → un simple tap réécoute
+    if (Date.now() - appuiDebut < 300) reecouterApercu();
+    return;
+  }
+  arreterVoix();
+}
+
+voixBtn.addEventListener("mousedown", gererAppui);
+voixBtn.addEventListener("mouseup", gererRelache);
+voixBtn.addEventListener("mouseleave", () => { if (enregistreEnCours) arreterVoix(); });
+voixBtn.addEventListener("touchstart", gererAppui, { passive: false });
+voixBtn.addEventListener("touchend", gererRelache, { passive: false });
+voixBtn.addEventListener("touchcancel", () => { if (enregistreEnCours) arreterVoix(); });
+
+voixSuppr.onclick = (e) => {
+  e.stopPropagation();
+  if (apercuAudio) { apercuAudio.pause(); apercuAudio = null; }
   fichierVoix = null; voixDataUrl = null;
-  voixBtn.classList.remove("pret");
+  enregistreEnCours = false;
+  voixBtn.classList.remove("pret", "rec");
   voixBtn.querySelector(".vb-ico").textContent = "🎙️";
   voixInfo.textContent = "Maintiens pour enregistrer un vocal";
   voixSuppr.style.display = "none";
@@ -2086,6 +2188,10 @@ function toast(msg, erreur = false) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove("on"), 2800);
 }
+
+document.getElementById("avertOk").onclick = () => {
+  document.getElementById("avertBox").classList.remove("on");
+};
 
 /* ============================================================
    PWA — enregistrement du service worker

@@ -30,39 +30,6 @@ const SEUIL_ABUS = 3;                       // masquage auto à 3 abus
 const MAX_PUB_PAR_HEURE = 15;              // rate-limiting serveur
 const DELAI_MIN_MS = 20000;                // 20s entre 2 signalements
 
-/* ============================================================
-   CONFIG EMAIL DE MODÉRATION (Brevo)
-   ------------------------------------------------------------
-   - BREVO_API_KEY : à créer sur brevo.com → SMTP & API → clé API
-     Pour la sécurité, on la lit depuis l'environnement (secret).
-   - EXPEDITEUR : doit être un email vérifié dans ton compte Brevo.
-   - MODERATEURS : la liste des mails qui reçoivent les alertes.
-     Ajoute/retire des modos ici puis redéploie les functions.
-   ============================================================ */
-const BREVO_API_KEY = process.env.BREVO_API_KEY || "";
-const EXPEDITEUR = { email: "mayanaearth@gmail.com", name: "DAKOUONE Modération" };
-const MODERATEURS = [
-  "mayanaearth@gmail.com"
-  // , "modo2@exemple.com"   ← ajoute tes modos ici au fil du temps
-];
-
-async function envoyerMailModeration(sujet, contenuHtml) {
-  if (!BREVO_API_KEY) { console.warn("BREVO_API_KEY manquante, mail non envoyé"); return; }
-  try {
-    const rep = await fetch("https://api.brevo.com/v3/smtp/email", {
-      method: "POST",
-      headers: { "api-key": BREVO_API_KEY, "Content-Type": "application/json", "accept": "application/json" },
-      body: JSON.stringify({
-        sender: EXPEDITEUR,
-        to: MODERATEURS.map((e) => ({ email: e })),
-        subject: sujet,
-        htmlContent: contenuHtml
-      })
-    });
-    if (!rep.ok) console.error("Brevo erreur:", rep.status, await rep.text());
-  } catch (e) { console.error("Envoi mail échoué:", e); }
-}
-
 function distanceM(lat1, lng1, lat2, lng2) {
   const R = 6371000, rad = Math.PI / 180;
   const dLat = (lat2 - lat1) * rad, dLng = (lng2 - lng1) * rad;
@@ -111,61 +78,18 @@ exports.controleCadence = onDocumentCreated("signalements/{sid}", async (event) 
 /* ============================================================
    2. MODÉRATION — masquage auto à 3 abus
    ============================================================ */
-exports.surAbus = onDocumentCreated(
-  { document: "signalements/{sid}/abus/{uid}", secrets: ["BREVO_API_KEY"] },
-  async (event) => {
+exports.surAbus = onDocumentCreated("signalements/{sid}/abus/{uid}", async (event) => {
   const ref = db.collection("signalements").doc(event.params.sid);
   await ref.update({ nbAbus: FieldValue.increment(1) });
 
   const snap = await ref.get();
   const d = snap.data();
-
-  // --- Récupère les noms de l'auteur du contenu et de la personne qui signale ---
-  const signaleurUid = event.params.uid;
-  let auteurNom = "Inconnu", signaleurNom = "Inconnu";
-  try {
-    if (d.creePar) {
-      const a = (await db.collection("utilisateurs").doc(d.creePar).get()).data() || {};
-      auteurNom = `${a.prenom || ""} ${a.nom || ""}`.trim() || a.pseudo || d.creePar;
-    }
-    const sgn = (await db.collection("utilisateurs").doc(signaleurUid).get()).data() || {};
-    signaleurNom = `${sgn.prenom || ""} ${sgn.nom || ""}`.trim() || sgn.pseudo || signaleurUid;
-  } catch (e) { console.error(e); }
-
-  // --- Envoi du mail aux modérateurs ---
-  const pos = d.position ? `${d.position.latitude.toFixed(4)}, ${d.position.longitude.toFixed(4)}` : "—";
-  const sujet = `🚩 DAKOUONE — Abus signalé (${d.nbAbus || 1} au total)`;
-  const html = `
-    <div style="font-family:Arial,sans-serif;color:#0d2030">
-      <h2 style="color:#ff5340">Signalement d'abus</h2>
-      <p>Un contenu vient d'être signalé comme abusif sur DAKOUONE.</p>
-      <table style="border-collapse:collapse;font-size:14px">
-        <tr><td style="padding:4px 10px;color:#5a6b78">Type de signalement</td><td style="padding:4px 10px"><b>${d.type || "—"}</b></td></tr>
-        <tr><td style="padding:4px 10px;color:#5a6b78">Commentaire</td><td style="padding:4px 10px">${(d.commentaire || "—").replace(/</g, "&lt;")}</td></tr>
-        <tr><td style="padding:4px 10px;color:#5a6b78">Position</td><td style="padding:4px 10px">${pos}</td></tr>
-        <tr><td style="padding:4px 10px;color:#5a6b78">Auteur du contenu</td><td style="padding:4px 10px"><b>${auteurNom}</b></td></tr>
-        <tr><td style="padding:4px 10px;color:#5a6b78">Signalé par</td><td style="padding:4px 10px"><b>${signaleurNom}</b></td></tr>
-        <tr><td style="padding:4px 10px;color:#5a6b78">Nombre d'abus</td><td style="padding:4px 10px"><b>${d.nbAbus || 1}</b> / ${SEUIL_ABUS} (masquage auto)</td></tr>
-      </table>
-      <p style="font-size:12px;color:#5a6b78;margin-top:16px">DAKOUONE — Modération automatique</p>
-    </div>`;
-  await envoyerMailModeration(sujet, html);
-
-  // --- Masquage auto à 3 abus + avertissement à l'auteur ---
   if ((d.nbAbus || 0) >= SEUIL_ABUS && d.verifiePar == null && d.statut !== "masque") {
     await ref.update({ statut: "masque", masqueLe: FieldValue.serverTimestamp() });
+    // Pénalité de fiabilité pour l'auteur d'un contenu massivement signalé
     if (d.creePar) {
-      await db.collection("utilisateurs").doc(d.creePar).set({
-        fiabilite: FieldValue.increment(-2),
-        avertissements: FieldValue.increment(1),
-        avertissementActif: {
-          message: "Un de tes signalements a été masqué après plusieurs signalements d'abus. " +
-                   "Après analyse des modérateurs, ton compte pourra être bloqué à vie en cas de récidive. " +
-                   "Ne publie que des signalements réels et vérifiables.",
-          date: FieldValue.serverTimestamp(),
-          lu: false
-        }
-      }, { merge: true });
+      await db.collection("utilisateurs").doc(d.creePar)
+        .set({ fiabilite: FieldValue.increment(-2) }, { merge: true });
     }
   }
 });

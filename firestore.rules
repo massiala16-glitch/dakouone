@@ -83,7 +83,7 @@ service cloud.firestore {
       // points / premium / role / banni / identiteVerifiee → Cloud Functions uniquement
       allow update: if connecte() && request.auth.uid == uid
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['pseudo','notifActives','positionApprox','fcmTokens'])
+             .hasOnly(['pseudo','notifActives','positionApprox','fcmTokens','avertissementActif'])
         && (
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['pseudo'])
           || resource.data.identiteVerifiee == true
