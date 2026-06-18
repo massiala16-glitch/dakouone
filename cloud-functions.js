@@ -40,9 +40,9 @@ const DELAI_MIN_MS = 20000;                // 20s entre 2 signalements
      Ajoute/retire des modos ici puis redéploie les functions.
    ============================================================ */
 const BREVO_API_KEY = process.env.BREVO_API_KEY || "";
-const EXPEDITEUR = { email: "mayanaearth@gmail.com", name: "DAKOUONE Modération" };
+const EXPEDITEUR = { email: "massiala16@gmail.com", name: "DAKOUONE Modération" };
 const MODERATEURS = [
-  "mayanaearth@gmail.com"
+  "massiala16@gmail.com"
   // , "modo2@exemple.com"   ← ajoute tes modos ici au fil du temps
 ];
 
