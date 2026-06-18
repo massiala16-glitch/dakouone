@@ -372,6 +372,22 @@
     border-radius:var(--radius);padding:12px;cursor:pointer;font-family:inherit;font-weight:700;font-size:.85rem;
   }
 
+  /* ----- Soutien / contact ----- */
+  .soutien-box{
+    border:1.5px solid var(--lagon);
+    background:linear-gradient(160deg, rgba(14,155,181,.10), rgba(14,155,181,.02));
+    border-radius:var(--radius);padding:15px;margin-bottom:16px;
+  }
+  .soutien-box h3{font-size:.95rem;color:var(--lagon);margin-bottom:7px}
+  .soutien-box p{font-size:.82rem;line-height:1.5;color:var(--ink);margin-bottom:11px}
+  .btn-contact{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    width:100%;background:var(--lagon);color:#fff;text-decoration:none;
+    border-radius:var(--radius);padding:12px;font-weight:700;font-size:.85rem;
+  }
+  .btn-contact:active{opacity:.9}
+  .soutien-mail{text-align:center;font-size:.76rem !important;color:var(--muted) !important;margin:9px 0 0 !important}
+
   /* ----- Premium ----- */
   .badge-premium{
     display:inline-flex;align-items:center;gap:5px;background:linear-gradient(100deg,#f59f0a,#ffcf6b);
@@ -770,6 +786,14 @@
       <button class="btn-premium" id="btnPremium">Passer en Premium</button>
     </div>
 
+    <!-- Soutenir / contacter le projet -->
+    <div class="soutien-box">
+      <h3>🌴 Soutenir DAKOUONE</h3>
+      <p>DAKOUONE est un projet né à Mayotte, pour Mayotte. Pour qu'il grandisse et reste accessible à tous, je cherche des partenaires et soutiens. Si tu veux participer, investir, ou simplement échanger sur le projet, écris-moi :</p>
+      <a class="btn-contact" href="mailto:mayanaearth@gmail.com?subject=DAKOUONE%20%E2%80%94%20Soutien%20au%20projet&body=Bonjour%2C%0A%0AJe%20vous%20contacte%20au%20sujet%20du%20projet%20DAKOUONE.%0A%0A">✉️ Nous contacter</a>
+      <p class="soutien-mail">mayanaearth@gmail.com</p>
+    </div>
+
     <button class="btn-deco" id="btnDeco">Se déconnecter</button>
   </div>
 </div>
@@ -783,6 +807,28 @@
     <h2 style="text-align:center;color:var(--alerte)">Avertissement</h2>
     <p id="avertTexte" style="font-size:.92rem;line-height:1.5;color:var(--ink);margin:12px 0 18px;text-align:center"></p>
     <button class="envoyer" id="avertOk" style="width:100%;background:var(--alerte);color:#fff">J'ai compris</button>
+  </div>
+</div>
+
+<!-- Message de bienvenue après inscription -->
+<div class="voile" id="bienvenueBox">
+  <div class="feuille" style="max-width:400px;text-align:center">
+    <div style="font-size:3rem;margin-bottom:4px">🌴</div>
+    <h2 style="color:var(--lagon)">Karibu sur DAKOUONE !</h2>
+    <p id="bienvenueNom" style="font-weight:700;color:var(--ink);margin:6px 0 14px"></p>
+    <p style="font-size:.9rem;line-height:1.55;color:var(--ink);text-align:left;margin-bottom:12px">
+      Ton compte est créé. Tu fais maintenant partie de la communauté qui veille sur Maore. Voici l'essentiel :
+    </p>
+    <ul style="font-size:.86rem;line-height:1.5;color:var(--ink);text-align:left;margin:0 0 16px;padding-left:18px">
+      <li>👀 <b>Signale</b> ce que tu observes : rassemblement, caillassage, route bloquée</li>
+      <li>📍 Tu dois être <b>sur place</b> pour signaler ou valider une alerte</li>
+      <li>🤝 Plus on est nombreux à valider, plus l'info est fiable</li>
+      <li>🚨 En danger immédiat, appelle toujours le <b>17</b> — ne t'approche jamais</li>
+    </ul>
+    <p style="font-size:.82rem;color:var(--lagon);font-weight:700;font-style:italic;margin-bottom:16px">
+      Nari sayidiyané — à plusieurs, nous sommes plus forts 💪
+    </p>
+    <button class="envoyer" id="bienvenueOk" style="width:100%">C'est parti !</button>
   </div>
 </div>
 
@@ -1242,6 +1288,7 @@ document.getElementById("choixGoogle").onclick = async () => {
     const cred = await fb.signInWithPopup(fb.auth, provider);
     const refProfil = fb.doc(fb.db, "utilisateurs", cred.user.uid);
     const dejaLa = await fb.getDoc(refProfil);
+    let nouveauCompteG = false;
     if (!dejaLa.exists()) {
       // Premier passage via Google : on récupère le nom depuis le compte Google
       const nomGoogle = (cred.user.displayName || "").trim().split(" ");
@@ -1254,9 +1301,15 @@ document.getElementById("choixGoogle").onclick = async () => {
         premium: false, notifActives: true,
         fiabilite: 0, banni: false, creeLe: fb.serverTimestamp()
       });
+      nouveauCompteG = true;
     }
     voileAuth.classList.remove("on");
-    toast("Connecté avec Google 🌴");
+    if (nouveauCompteG) {
+      const pn = (cred.user.displayName || "").trim().split(" ")[0] || "";
+      afficherBienvenue(pn);
+    } else {
+      toast("Connecté avec Google 🌴");
+    }
   } catch (e) {
     console.error(e);
     if (e.code !== "auth/popup-closed-by-user") toast("Connexion Google impossible", true);
@@ -1466,6 +1519,7 @@ btnSms.onclick = async () => {
           return;
         }
 
+        let nouveauCompte = false;
         if (!dejaLa.exists()) {
           // Création du compte (premier passage)
           await fb.setDoc(refProfil, {
@@ -1476,13 +1530,22 @@ btnSms.onclick = async () => {
             premium: false, notifActives: true,
             fiabilite: 0, banni: false, creeLe: fb.serverTimestamp()
           });
+          nouveauCompte = true;
         }
         // Si le compte existe déjà → on ne réécrit rien, simple connexion
+        voileAuth.classList.remove("on");
+        confirmation = null;
+        infosInscription = null;
+        if (nouveauCompte) { afficherBienvenue(info.prenom); }
+        else { toast("Reconnecté — karibu ! 🌴"); }
+        btnSms.disabled = false;
+        return;
       }
       voileAuth.classList.remove("on");
       confirmation = null;
       infosInscription = null;
-      toast(modeAuth === "connexion" ? "Reconnecté — karibu ! 🌴" : "Compte créé — karibu ! 🌴");
+      // MODE_DEMO : nouvelle inscription = bienvenue
+      afficherBienvenue(info.prenom);
     } catch (e) {
       console.error(e);
       toast("Code incorrect, réessaie", true);
@@ -2415,6 +2478,16 @@ function toast(msg, erreur = false) {
 
 document.getElementById("avertOk").onclick = () => {
   document.getElementById("avertBox").classList.remove("on");
+};
+
+/* Message de bienvenue après inscription (affiché une seule fois, à la création du compte) */
+function afficherBienvenue(prenom) {
+  const nom = (prenom || "").trim();
+  document.getElementById("bienvenueNom").textContent = nom ? `Bienvenue ${nom} 🌴` : "";
+  document.getElementById("bienvenueBox").classList.add("on");
+}
+document.getElementById("bienvenueOk").onclick = () => {
+  document.getElementById("bienvenueBox").classList.remove("on");
 };
 
 /* ============================================================
