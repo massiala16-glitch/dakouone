@@ -211,7 +211,24 @@
     border:1px solid #d9e2ea;border-bottom:none;
     padding:20px 18px calc(20px + env(safe-area-inset-bottom));
     max-height:88vh;overflow-y:auto;animation:monte .25s ease;
+    position:relative;
   }
+  .feuille-fermer{
+    position:absolute;top:14px;right:14px;z-index:5;
+    width:34px;height:34px;border-radius:50%;border:none;
+    background:var(--panel2);color:var(--muted);font-size:1.1rem;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;line-height:1;
+  }
+  .feuille-fermer:active{background:#d9e2ea}
+  body.nuit .feuille-fermer{background:#1e2733;color:#9fb0c0}
+  .btn-gps{
+    width:100%;background:rgba(14,155,181,.10);border:1.5px solid var(--lagon);
+    color:var(--lagon);border-radius:var(--radius);padding:12px;cursor:pointer;
+    font-family:inherit;font-weight:700;font-size:.85rem;margin-bottom:9px;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+  }
+  .btn-gps:active{background:rgba(14,155,181,.20)}
+  .btn-gps.ok{border-color:var(--ok);background:rgba(15,174,116,.10);color:var(--ok)}
   @keyframes monte{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
   .feuille h2{font-size:1.05rem;margin-bottom:3px}
   .feuille .sous{color:var(--muted);font-size:.78rem;margin-bottom:16px}
@@ -615,6 +632,7 @@
 <!-- Modal signalement -->
 <div class="voile" id="voile">
   <div class="feuille">
+    <button class="feuille-fermer" id="signalFermer" aria-label="Fermer">✕</button>
     <h2>Nouveau signalement</h2>
     <p class="sous">Touche la carte derrière pour placer le point, ou utilise ta position GPS. Astuce : maintiens le bouton Signaler pour publier vite sur place.</p>
     <div class="label">Type d'incident</div>
@@ -629,7 +647,8 @@
       <button class="niv sel" data-n="2">Vigilance</button>
       <button class="niv" data-n="3">Danger</button>
     </div>
-    <div class="pos-info" id="posInfo">📍 Position : touche la carte ou le bouton GPS</div>
+    <button class="btn-gps" id="btnGps">📍 Utiliser ma position actuelle</button>
+    <div class="pos-info" id="posInfo">Position : touche la carte ou le bouton ci-dessus</div>
     <div class="label">Commentaire (optionnel)</div>
     <textarea id="commentaire" placeholder="Détails utiles : nombre, direction, véhicules…" maxlength="180"></textarea>
     <div class="photo-zone" id="photoZone">📷 Ajouter une photo (optionnel)</div>
@@ -1926,6 +1945,9 @@ document.getElementById("ouvrirSignal").onclick = () => {
   verifEnvoi();
 };
 document.getElementById("annuler").onclick = fermerModal;
+document.getElementById("signalFermer").onclick = fermerModal;
+// Fermer en cliquant sur le voile (à côté de la feuille)
+voile.addEventListener("click", (e) => { if (e.target === voile) fermerModal(); });
 
 function fermerModal() {
   voile.classList.remove("on");
@@ -1936,7 +1958,9 @@ function fermerModal() {
   document.querySelectorAll(".type-btn").forEach(b => b.classList.remove("sel"));
   document.getElementById("commentaire").value = "";
   document.getElementById("photoZone").innerHTML = "📷 Ajouter une photo (optionnel)";
-  document.getElementById("posInfo").textContent = "📍 Position : touche la carte ou le bouton GPS";
+  document.getElementById("posInfo").textContent = "Position : touche la carte ou le bouton ci-dessus";
+  const bg = document.getElementById("btnGps");
+  bg.textContent = "📍 Utiliser ma position actuelle"; bg.classList.remove("ok");
   if (marqueurTemp) { map.removeLayer(marqueurTemp); marqueurTemp = null; }
 }
 
@@ -1975,6 +1999,28 @@ document.getElementById("maPos").onclick = () => {
     document.getElementById("posInfo").textContent = "📍 Position GPS détectée ✓";
     verifEnvoi();
   }, () => toast("Position refusée ou indisponible", true));
+};
+
+/* Bouton GPS DANS le formulaire de signalement */
+document.getElementById("btnGps").onclick = () => {
+  const btn = document.getElementById("btnGps");
+  if (!navigator.geolocation) { toast("GPS non disponible", true); return; }
+  btn.textContent = "📍 Localisation en cours…";
+  navigator.geolocation.getCurrentPosition((p) => {
+    const ll = L.latLng(p.coords.latitude, p.coords.longitude);
+    choixPos = ll;
+    if (marqueurTemp) map.removeLayer(marqueurTemp);
+    marqueurTemp = L.circleMarker(ll, { radius: 9, color: "#0e9bb5", weight: 2, fillOpacity: .3 }).addTo(map);
+    map.setView(ll, 15);
+    afficherMaPosition(p.coords.latitude, p.coords.longitude);
+    btn.textContent = "📍 Position détectée ✓";
+    btn.classList.add("ok");
+    document.getElementById("posInfo").textContent = "Position GPS enregistrée ✓";
+    verifEnvoi();
+  }, () => {
+    btn.textContent = "📍 Utiliser ma position actuelle";
+    toast("Position refusée ou indisponible. Active ta localisation.", true);
+  }, { enableHighAccuracy: true, timeout: 8000 });
 };
 
 /* Photo : compression client (≤ 800 px, JPEG 70 %) */
