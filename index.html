@@ -177,6 +177,7 @@
   .pop-com{font-size:.82rem;margin-bottom:9px;color:#3d4a58}
   .pop-photo{width:100%;border-radius:9px;margin-bottom:9px;max-height:150px;object-fit:cover}
   .pop-conf{font-size:.74rem;color:var(--ok);margin-bottom:9px}
+  .pop-leve{color:var(--alerte);font-weight:600}
   .pop-btns{display:flex;gap:7px}
   .pop-btns button{flex:1;border:none;border-radius:9px;padding:8px 4px;cursor:pointer;font-size:.74rem;font-weight:600;font-family:inherit}
   .b-encore{background:rgba(255,176,32,.16);color:var(--vigilance)}
@@ -1519,7 +1520,7 @@ if (!MODE_DEMO) {
       const s = { id, ...ch.doc.data() };
       if (ch.type === "removed" || estExpire(s)) { retirerMarqueur(id); return; }
       if (ch.type === "added") { ajouterMarqueur(s); evaluerNotif(s); }
-      if (ch.type === "modified") { retirerMarqueur(id); ajouterMarqueur(s); }
+      if (ch.type === "modified") { majMarqueur(id, s); }
     });
     majCompteur();
   }, (err) => {
@@ -1624,9 +1625,18 @@ function popupPour(s) {
         ? `<div class="badge-verif" style="border-color:var(--ok);color:var(--ok);background:rgba(53,201,142,.12)">Confirmé par la communauté</div>`
         : "");
   const auteur = s.auteurPseudo ? ` · par ${echap(s.auteurPseudo)}` : "";
-  const jauge = estConfirme(s)
-    ? `✓ ${s.confirmations || 0} confirmation${(s.confirmations||0) > 1 ? "s" : ""}`
-    : `⏳ ${s.confirmations || 0}/${SEUIL_CONFIRMATION} validations — valide sur place si tu y es`;
+  const conf = s.confirmations || 0;
+  const inf = s.infirmations || 0;
+  // Jauge de validation (confirmations) + progression de levée (infirmations, 3 pour lever)
+  let jauge;
+  if (estConfirme(s)) {
+    jauge = `✓ ${conf} confirmation${conf > 1 ? "s" : ""}`;
+  } else {
+    jauge = `⏳ ${conf}/${SEUIL_CONFIRMATION} validations — valide sur place si tu y es`;
+  }
+  if (inf > 0) {
+    jauge += `<br><span class="pop-leve">🚩 ${inf}/3 votes « terminé » (3 pour retirer l'alerte)</span>`;
+  }
   const estMien = utilisateur && s.creePar === utilisateur.uid;
   const btnSuppr = estMien
     ? `<button class="b-suppr" data-suppr="${s.id}">🗑️ Supprimer mon signalement</button>` : "";
@@ -1674,6 +1684,24 @@ function ajouterMarqueur(s) {
 function retirerMarqueur(id) {
   const m = marqueurs[id];
   if (m) { map.removeLayer(m); delete marqueurs[id]; }
+}
+
+/* Met à jour un marqueur existant SANS le détruire (garde la popup ouverte
+   et rafraîchie en temps réel quand les votes/compteurs changent). */
+function majMarqueur(id, s) {
+  const m = marqueurs[id];
+  if (!m) { ajouterMarqueur(s); return; }   // pas encore affiché → on l'ajoute
+  // Disparu par modération → on retire
+  if (s.statut === "masque" || (s.nbAbus || 0) >= 3) { retirerMarqueur(id); return; }
+  m._dak = s;
+  m.setIcon(iconePour(s));                  // l'icône peut changer (ex. confirmé)
+  // Si la popup de ce marqueur est ouverte, on rafraîchit son contenu en direct
+  if (m.isPopupOpen()) {
+    m.setPopupContent(popupPour(s));
+  }
+  // Respecte les filtres en cours
+  const el = m.getElement();
+  if (el) el.style.display = typesActifs.has(s.type) ? "" : "none";
 }
 
 /* ----- Votes ----- */
@@ -1732,7 +1760,11 @@ document.addEventListener("click", async (e) => {
       { sens, date: fb.serverTimestamp(),
         position: new fb.GeoPoint(pos.lat, pos.lng) });
     map.closePopup();
-    toast(sens === "confirme" ? "Merci — validation enregistrée ✓" : "Vote enregistré — asante !");
+    if (sens === "confirme") {
+      toast("Merci — validation enregistrée ✓");
+    } else {
+      toast("Vote « terminé » enregistré. Il faut 3 votes pour retirer l'alerte.");
+    }
   } catch {
     toast("Tu as déjà voté sur ce signalement", true);
   }
