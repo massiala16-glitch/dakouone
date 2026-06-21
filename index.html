@@ -63,11 +63,18 @@
   .dot{width:9px;height:9px;border-radius:50%;background:var(--alerte);animation:pulseDot 1.6s ease-out infinite}
   @keyframes pulseDot{0%{box-shadow:0 0 0 0 rgba(255,83,64,.55)}100%{box-shadow:0 0 0 9px rgba(255,83,64,0)}}
   .profil{
-    width:36px;height:36px;border-radius:50%;border:1.5px solid #d9e2ea;cursor:pointer;
-    background:var(--panel);color:var(--muted);font-size:.9rem;
-    display:flex;align-items:center;justify-content:center;
+    width:38px;height:38px;border-radius:50%;border:1.5px solid #d9e2ea;cursor:pointer;
+    background:var(--panel);color:var(--muted);font-size:1.1rem;position:relative;
+    display:flex;align-items:center;justify-content:center;padding:0;line-height:1;
   }
-  .profil.ok{border-color:var(--ok);color:var(--ok)}
+  .profil.ok{border-color:var(--ok)}
+  /* Petit point vert en bas à droite quand connecté */
+  .profil.ok::after{
+    content:"";position:absolute;bottom:-1px;right:-1px;
+    width:11px;height:11px;border-radius:50%;background:var(--ok);
+    border:2px solid var(--panel);
+  }
+  body.nuit .profil.ok::after{border-color:var(--panel)}
 
   .urgence{
     position:absolute;top:58px;left:50%;transform:translateX(-50%);z-index:1000;
@@ -1244,7 +1251,7 @@ function afficherAvertissement(message) {
 function majProfil() {
   const p = document.getElementById("profilBtn");
   p.classList.toggle("ok", !!utilisateur);
-  p.textContent = utilisateur ? "✓" : "👤";
+  p.textContent = "👤";   // toujours l'icône profil (la bordure verte indique la connexion)
   if (!utilisateur) { profil = null; if (stopProfil) { stopProfil(); stopProfil = null; } }
   majUIProfil();
 }
