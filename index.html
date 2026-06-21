@@ -48,6 +48,12 @@
   .logo b{font-size:1.15rem;letter-spacing:.04em}
   .logo b span{color:var(--vigilance)}
   .logo small{font-size:.65rem;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
+  .badge-beta{
+    background:linear-gradient(100deg,#f59f0a,#ffcf6b);color:#3a2706;
+    border:none;border-radius:999px;padding:3px 9px;font-size:.62rem;font-weight:800;
+    letter-spacing:.08em;cursor:pointer;font-family:inherit;align-self:flex-start;margin-top:3px;
+  }
+  .badge-beta:active{opacity:.85}
   .compteur{
     margin-left:auto;background:var(--panel);border:1px solid #d9e2ea;border-radius:999px;
     padding:6px 12px;font-size:.8rem;display:flex;align-items:center;gap:7px;cursor:pointer;
@@ -550,6 +556,7 @@
     <b>DAKOU<span>ONE</span></b>
     <small>Vigilance · Maore</small>
   </div>
+  <button class="badge-beta" id="badgeBeta" title="En savoir plus">BÊTA</button>
   <div class="compteur" id="compteur"><span class="dot"></span><span id="nbActifs">0</span>&nbsp;signalements actifs</div>
   <div class="points-pill" id="pointsPill">🪨 <span id="pointsVal">0</span></div>
   <button class="profil" id="profilBtn" title="Mon compte">👤</button>
@@ -795,6 +802,25 @@
     </div>
 
     <button class="btn-deco" id="btnDeco">Se déconnecter</button>
+  </div>
+</div>
+
+<!-- Info version Bêta -->
+<div class="voile" id="betaBox">
+  <div class="feuille" style="max-width:380px;text-align:center">
+    <div style="font-size:2.6rem;margin-bottom:4px">🚧</div>
+    <h2 style="color:var(--vigilance)">Version Bêta</h2>
+    <p style="font-size:.9rem;line-height:1.55;color:var(--ink);text-align:left;margin:12px 0 16px">
+      DAKOUONE est en <b>version bêta</b> : l'app est fonctionnelle, mais encore en cours d'amélioration.
+      <br><br>
+      🔧 Des <b>mises à jour sont effectuées chaque jour</b> pour corriger les bugs et ajouter des fonctionnalités.
+      <br><br>
+      💬 Ton avis compte énormément ! N'hésite pas à m'envoyer tes idées d'amélioration ou les problèmes rencontrés via le bouton <b>« Nous contacter »</b> dans ton profil.
+    </p>
+    <p style="font-size:.82rem;color:var(--lagon);font-weight:700;font-style:italic;margin-bottom:16px">
+      Merci de faire grandir DAKOUONE avec moi 🌴
+    </p>
+    <button class="envoyer" id="betaOk" style="width:100%">J'ai compris</button>
   </div>
 </div>
 
@@ -1292,10 +1318,12 @@ document.getElementById("choixGoogle").onclick = async () => {
     if (!dejaLa.exists()) {
       // Premier passage via Google : on récupère le nom depuis le compte Google
       const nomGoogle = (cred.user.displayName || "").trim().split(" ");
+      const pPrenom = nomGoogle[0] || "";
+      const pNom = nomGoogle.slice(1).join(" ") || "";
       await fb.setDoc(refProfil, {
         role: "citoyen", telephoneVerifie: false,
         pseudo: pseudoParDefaut(),
-        prenom: nomGoogle[0] || "", nom: nomGoogle.slice(1).join(" ") || "", naissance: "",
+        prenom: pPrenom, nom: pNom, naissance: "",
         email: cred.user.email || "",
         points: 0, identiteVerifiee: false,
         premium: false, notifActives: true,
@@ -2488,6 +2516,14 @@ function afficherBienvenue(prenom) {
 }
 document.getElementById("bienvenueOk").onclick = () => {
   document.getElementById("bienvenueBox").classList.remove("on");
+};
+
+/* Info version Bêta (clic sur le badge BÊTA) */
+document.getElementById("badgeBeta").onclick = () => {
+  document.getElementById("betaBox").classList.add("on");
+};
+document.getElementById("betaOk").onclick = () => {
+  document.getElementById("betaBox").classList.remove("on");
 };
 
 /* ============================================================
