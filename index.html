@@ -63,11 +63,13 @@
   .dot{width:9px;height:9px;border-radius:50%;background:var(--alerte);animation:pulseDot 1.6s ease-out infinite}
   @keyframes pulseDot{0%{box-shadow:0 0 0 0 rgba(255,83,64,.55)}100%{box-shadow:0 0 0 9px rgba(255,83,64,0)}}
   .profil{
-    width:38px;height:38px;border-radius:50%;border:1.5px solid #d9e2ea;cursor:pointer;
-    background:var(--panel);color:var(--muted);font-size:1.1rem;position:relative;
+    width:38px;height:38px;min-width:38px;border-radius:50%;border:1.5px solid #d9e2ea;cursor:pointer;
+    background:var(--panel);color:var(--muted);font-size:.95rem;position:relative;
     display:flex;align-items:center;justify-content:center;padding:0;line-height:1;
+    overflow:visible;flex:none;
   }
-  .profil.ok{border-color:var(--ok)}
+  .profil.ok{border-color:var(--ok);color:var(--ok)}
+  .profil svg{display:block}
   /* Petit point vert en bas à droite quand connecté */
   .profil.ok::after{
     content:"";position:absolute;bottom:-1px;right:-1px;
@@ -566,7 +568,12 @@
   <button class="badge-beta" id="badgeBeta" title="En savoir plus">BÊTA</button>
   <div class="compteur" id="compteur"><span class="dot"></span><span id="nbActifs">0</span>&nbsp;signalements actifs</div>
   <div class="points-pill" id="pointsPill">🪨 <span id="pointsVal">0</span></div>
-  <button class="profil" id="profilBtn" title="Mon compte">👤</button>
+  <button class="profil" id="profilBtn" title="Mon compte" aria-label="Mon compte">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="8" r="4"/>
+      <path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>
+    </svg>
+  </button>
 </header>
 
 <div class="urgence">En danger immédiat&nbsp;? Appelez le <b>17</b> — ne vous approchez jamais.</div>
@@ -1250,8 +1257,7 @@ function afficherAvertissement(message) {
 
 function majProfil() {
   const p = document.getElementById("profilBtn");
-  p.classList.toggle("ok", !!utilisateur);
-  p.textContent = "👤";   // toujours l'icône profil (la bordure verte indique la connexion)
+  p.classList.toggle("ok", !!utilisateur);   // bordure + point vert si connecté (le SVG reste)
   if (!utilisateur) { profil = null; if (stopProfil) { stopProfil(); stopProfil = null; } }
   majUIProfil();
 }
